@@ -312,7 +312,7 @@ export default function HomeScreen() {
               <ArtistCard artist={artist} />
             </View>
           ))}
-          {/* Invisible fillers: keep the last row full so space-between never stretches or repositions leftover cards */}
+          {/* Centered grid: fillers are not needed with justifyContent: 'center' */}
           {Array.from({ length: columns > 1 ? (columns - (filteredArtists.length % columns)) % columns : 0 }).map((_, index) => (
             <View key={`filler-${index}`} style={[styles.cardWrap, { width: cardWidth }]} aria-hidden="true" />
           ))}
@@ -417,13 +417,14 @@ const styles = StyleSheet.create({
   dataNote: { color: theme.muted, fontSize: 10, lineHeight: 16, flex: 1 },
   dataNotice: { maxWidth: 1100, width: '90%', alignSelf: 'center', backgroundColor: '#EAE1D7', padding: 12, marginTop: -10, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
   retryText: { color: theme.accent, fontSize: 9, fontWeight: '700', letterSpacing: 1 },
-  textButtonHovered: { opacity: 0.72 },
-  loading: { width: '100%', marginBottom: 24 },
-  grid: { maxWidth: 1100, width: '90%', alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  mapContainer: { maxWidth: 1100, width: '90%', alignSelf: 'center', borderWidth: 1, borderColor: theme.border, backgroundColor: theme.panelSoft, padding: 8 },
-  mapLegend: { flexDirection: 'row', gap: 16, paddingHorizontal: 8, paddingVertical: 9 },
-  mapLegendText: { color: theme.muted, fontSize: 11 },
-  eventLegendDot: { color: '#365B73' },
+    textButtonHovered: { opacity: 0.72 },
+    loading: { width: '100%', marginBottom: 24 },
+    grid: { maxWidth: 1100, width: '90%', alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+    gridItem: { gap: 24 },
+    mapContainer: { maxWidth: 1100, width: '90%', alignSelf: 'center', borderWidth: 1, borderColor: theme.border, backgroundColor: theme.panelSoft, padding: 8 },
+    mapLegend: { flexDirection: 'row', gap: 16, paddingHorizontal: 8, paddingVertical: 9 },
+    mapLegendText: { color: theme.muted, fontSize: 11 },
+    eventLegendDot: { color: '#365B73' },
   musicianLegendDot: { color: '#9A5C38' },
   mapNote: { color: theme.muted, fontSize: 10, lineHeight: 15, paddingHorizontal: 8, paddingTop: 8, paddingBottom: 4 },
   cardWrap: { minWidth: 0 },
