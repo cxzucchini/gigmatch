@@ -87,7 +87,6 @@ export default function ArtistCard({ artist }) {
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    maxWidth: 340,
     height: 465,
     backgroundColor: theme.background,
     borderWidth: 1,
