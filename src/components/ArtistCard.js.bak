@@ -1,0 +1,102 @@
+import React from 'react';
+import { View, Text, Image, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { theme } from '../styles/theme';
+import HoverPressable from './HoverPressable';
+
+export default function ArtistCard({ artist }) {
+  const router = useRouter();
+
+  const handlePress = () => router.push({ pathname: '/artist/[id]', params: { id: String(artist._id || artist.id) } });
+
+  return (
+    <HoverPressable
+      onPress={handlePress}
+      style={styles.card}
+      hoverStyle={styles.cardHovered}
+      pressedStyle={styles.cardPressed}
+      accessibilityRole="button"
+      accessibilityLabel={`View ${artist.name} profile`}
+    >
+      <Image source={{ uri: artist.image }} style={styles.image} />
+      <View style={styles.content}>
+        <Text style={styles.genre}>{artist.genre.toUpperCase()}</Text>
+        <Text style={styles.description}>{artist.description}</Text>
+        <Text style={styles.name}>{artist.name}</Text>
+        {Number.isFinite(artist.distanceKm) ? (
+          <Text style={styles.distance}>{artist.distanceKm.toFixed(1)} km from your event</Text>
+        ) : null}
+        <View style={styles.bottomRow}>
+          <Text style={styles.price}>₱{artist.price.toLocaleString()}+ / SET</Text>
+          <Text style={styles.rating}>{artist.rating ? `★ ${artist.rating.toFixed(1)}` : 'NEW'}</Text>
+        </View>
+      </View>
+    </HoverPressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: {
+    backgroundColor: theme.panelSoft,
+    borderWidth: 1,
+    borderColor: theme.border,
+    borderRadius: 4,
+    marginBottom: 20,
+  },
+  cardHovered: { borderColor: theme.accent, shadowColor: '#35251D', shadowOpacity: 0.16, shadowRadius: 12, shadowOffset: { width: 0, height: 7 }, elevation: 5, transform: [{ translateY: -3 }] },
+  cardPressed: { opacity: 0.94, transform: [{ translateY: 0 }] },
+  image: {
+    width: '100%',
+    height: 210,
+    resizeMode: 'cover',
+    backgroundColor: '#d9d0c7',
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  content: {
+    paddingHorizontal: 14,
+    paddingTop: 11,
+    paddingBottom: 13,
+  },
+  genre: {
+    fontSize: 12,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: theme.accent,
+    marginBottom: 8,
+    fontWeight: '600',
+  },
+  description: {
+    color: theme.muted,
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 14,
+    minHeight: 52,
+  },
+  name: {
+    fontSize: 23,
+    lineHeight: 29,
+    color: theme.accent,
+    fontFamily: 'Georgia',
+    marginBottom: 10,
+  },
+  distance: { color: theme.muted, fontSize: 11, marginTop: -7, marginBottom: 8 },
+  bottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  price: {
+    color: theme.accent,
+    fontSize: 12,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    fontWeight: '600',
+  },
+  rating: {
+    color: theme.accent,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+});

@@ -1,11 +1,24 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Gigmatch",
+    "slug": "gigmatch",
     "version": "1.0.0",
     "orientation": "portrait",
+    "scheme": "gigmatch",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "extra": {
+      "apiUrl": "https://server-tau-wine.vercel.app/api"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "root": "src/app"
+        }
+      ],
+      "expo-notifications"
+    ],
     "ios": {
       "supportsTablet": true
     },
