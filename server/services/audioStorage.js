@@ -54,17 +54,23 @@ const extensionForFile = (file) => {
   return '.mp3';
 };
 
-const uploadToCloudinary = (buffer, publicId) => new Promise((resolve, reject) => {
+const uploadBufferToCloudinary = (buffer, { folder, publicId, resourceType = 'auto' } = {}) => new Promise((resolve, reject) => {
   configureCloudinary();
   const stream = cloudinary.uploader.upload_stream(
     {
-      folder: 'gigmatch/playlists',
-      public_id: publicId,
-      resource_type: 'auto',
+      ...(folder ? { folder } : {}),
+      ...(publicId ? { public_id: publicId } : {}),
+      resource_type: resourceType,
     },
     (error, uploaded) => (error ? reject(error) : resolve(uploaded)),
   );
   stream.end(buffer);
+});
+
+const uploadToCloudinary = (buffer, publicId) => uploadBufferToCloudinary(buffer, {
+  folder: 'gigmatch/playlists',
+  publicId,
+  resourceType: 'auto',
 });
 
 const saveLocalFile = (buffer, filename) => {
@@ -94,6 +100,22 @@ const persistAudioUpload = async (file, userId) => {
     return { url: uploaded.secure_url, publicId: uploaded.public_id };
   }
   const filename = localFilenameFor(userId, file);
+  saveLocalFile(file.buffer, filename);
+  return { url: `/uploads/${filename}`, publicId: filename };
+};
+
+const persistImageUpload = async (file, userId) => {
+  if (isCloudinaryConfigured()) {
+    const publicId = `gallery-${userId || 'anon'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const uploaded = await uploadBufferToCloudinary(file.buffer, {
+      folder: 'gigmatch/gallery',
+      publicId,
+      resourceType: 'image',
+    });
+    return { url: uploaded.secure_url, publicId: uploaded.public_id };
+  }
+  const ext = path.extname(file.originalname || '').toLowerCase() || '.jpg';
+  const filename = `gallery-${userId || 'anon'}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`;
   saveLocalFile(file.buffer, filename);
   return { url: `/uploads/${filename}`, publicId: filename };
 };
@@ -129,10 +151,12 @@ module.exports = {
   AUDIO_EXTENSION_ALLOWLIST,
   extensionForFile,
   isCloudinaryConfigured,
+  uploadBufferToCloudinary,
   uploadToCloudinary,
   saveLocalFile,
   localFilenameFor,
   persistAudioUpload,
+  persistImageUpload,
   deleteAudioAsset,
   uploadsDir,
 };

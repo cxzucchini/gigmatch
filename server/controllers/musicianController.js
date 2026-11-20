@@ -269,19 +269,19 @@ const updateMyAvailability = async (req, res, next) => {
 
 const upsertMyMusicianProfile = async (req, res, next) => {
   const {
-      bio,
-      genres,
-      experienceYears,
-      hourlyRate,
-      serviceArea,
-      contactPhone,
-      profileImageUrl,
-      gallery,
-      playlist,
-      published,
-      govIdImage,
-      socialLinks,
-    } = req.body;
+    bio,
+    genres,
+    experienceYears,
+    hourlyRate,
+    serviceArea,
+    contactPhone,
+    profileImageUrl,
+    gallery,
+    playlist,
+    published,
+    govIdImage,
+    socialLinks,
+  } = req.body;
   const existingProfile = await Musician.findOne({ user: req.user._id })
     .select('bio genres hourlyRate serviceArea serviceAreaCoordinates verificationStatus govIdImage socialLinks verified');
 
@@ -406,7 +406,7 @@ const upsertMyMusicianProfile = async (req, res, next) => {
     serviceArea: serviceArea?.trim(),
     contactPhone: contactPhone?.trim(),
     profileImageUrl,
-  gallery: gallery?.map((url) => url.trim()),
+    gallery: gallery?.map((url) => url.trim()),
     playlist: playlist?.map((track) => ({
       title: typeof track.title === 'string' ? track.title.trim().slice(0, 120) : '',
       url: typeof track.url === 'string' ? track.url.trim() : '',
@@ -496,12 +496,16 @@ const upsertMyMusicianProfile = async (req, res, next) => {
 };
 
 const uploadGalleryImage = async (req, res, next) => {
+  const { persistImageUpload } = require('../services/audioStorage');
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'Choose an image to upload' });
     }
-    const url = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-    return res.status(201).json({ url });
+    const stored = await persistImageUpload(req.file, req.user?._id);
+    const url = stored.url.startsWith('/uploads/')
+      ? `${req.protocol}://${req.get('host')}${stored.url}`
+      : stored.url;
+    return res.status(201).json({ url, publicId: stored.publicId });
   } catch (error) {
     return next(error);
   }
