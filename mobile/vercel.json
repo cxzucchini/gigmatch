@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "npm install --ignore-scripts",
-  "buildCommand": "EXPO_PUBLIC_API_URL=https://gigmatch-orcin.vercel.app npm run build:web",
+  "buildCommand": "EXPO_PUBLIC_API_URL=https://gigmatch-orcin.vercel.app/api/$1 npm run build:web",
   "outputDirectory": "dist",
   "rewrites": [
     {
