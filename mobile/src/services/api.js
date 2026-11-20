@@ -10,14 +10,18 @@ if (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_API
   }
 }
 
+API_URL = String(API_URL || '').trim().replace(/\/+$/, '');
+
 export async function apiRequest(path, { token, ...options } = {}) {
   if (!API_URL) {
     throw new Error('Live services are not configured in this preview.');
   }
 
+  const normalizedPath = `/${String(path || '').replace(/^\/+/, '')}`;
+  const url = `${API_URL}${normalizedPath}`;
+
   let response;
   try {
-    const url = API_URL + path;
     const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
     response = await fetch(url, {
       ...options,
