@@ -1,13 +1,4 @@
-const os = require('os');
-const path = require('path');
-const fs = require('fs');
 const multer = require('multer');
-
-const uploadsDir = process.env.VERCEL
-  ? path.join(os.tmpdir(), 'uploads')
-  : path.join(__dirname, '..', 'uploads');
-
-fs.mkdirSync(uploadsDir, { recursive: true });
 
 const EXTENSIONS = {
   'image/jpeg': '.jpg',
@@ -15,17 +6,8 @@ const EXTENSIONS = {
   'image/webp': '.webp',
 };
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, uploadsDir),
-  filename: (req, file, cb) => {
-    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const ext = EXTENSIONS[file.mimetype] || '.jpg';
-    cb(null, `gallery-${req.user?._id || 'anon'}-${unique}${ext}`);
-  },
-});
-
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (EXTENSIONS[file.mimetype]) return cb(null, true);
