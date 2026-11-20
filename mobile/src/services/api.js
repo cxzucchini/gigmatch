@@ -1,4 +1,4 @@
-let API_URL = 'https://server-tau-wine.vercel.app/api';
+let API_URL = 'https://gigmatch-orcin.vercel.app/api';
 
 // Use localhost for local development when running via Expo
 if (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_API_URL) {
