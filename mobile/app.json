@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Gigmatch",
+    "slug": "gigmatch",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "gigmatch",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "extra": {
+      "apiUrl": "https://server-tau-wine.vercel.app/api"
+    },
+    "plugins": [
+      ["expo-router", { "root": "src/app" }],
+      "expo-notifications",
+      ["expo-image-picker", {}],
+      ["expo-document-picker", {}]
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.gigmatch.app"
+    },
+    "web": {
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

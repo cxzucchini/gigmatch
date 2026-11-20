@@ -1,41 +1,30 @@
-This is an Expo/React Native mobile application. Prioritize mobile-first patterns, performance, and cross-platform compatibility.
+# Gigmatch Project Rules
 
-## Expo has changed — do not trust your training data
+## Stack & Structure
+- Frontend: Expo / React Native (`mobile/src/app/...`, Metro port `8081`)
+- Backend: Express + MongoDB Atlas (`server/server.js`, port `5000`, URI in `server/.env`)
 
-Expo ships breaking changes every SDK release. APIs you remember are likely renamed, moved, or removed. Before writing any code that touches an Expo, EAS, or React Native API:
+## Environment & Shell (Windows + Git Bash)
+- Terminal runs in Git Bash (MSYS). Use POSIX shell syntax (`&&`, `rm -rf`, single quotes) and forward-slash paths (`C:/Users/Jay/...`).
+- Use `$TMPDIR` (never bare `/tmp`) for scratch files.
+- Never run `npx expo start` (blocks the shell). To verify frontend builds, run:
+  `npx expo export --platform web --output-dir .expo-check && rm -rf .expo-check`
+- Do not start a second `node server.js` if port `5000` is already active.
 
-1. Read the major version of the `expo` package in `package.json`.
-2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
-3. For anything else, fetch https://docs.expo.dev/llms.txt — an index of all Expo docs with corrections to common LLM misconceptions. Follow its links to the specific page you need; never answer from memory.
-
-## Commands
-
-Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).
-
-```bash
-npx expo install <package>  # ALWAYS use instead of npm/yarn/pnpm/bun add — resolves SDK-compatible versions
-npx expo start              # start the dev server
-npx expo lint               # lint
-npx tsc --noEmit            # typecheck
-npx expo-doctor             # diagnose dependency and config issues
-npx expo install --fix      # fix incompatible package versions
-```
-
-Run lint and typecheck before declaring any task done.
-
-## Navigation & Routing
-
-- Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.
-- Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`.
-- Docs: https://docs.expo.dev/router/introduction.md
-
-## Building with EAS
-
-Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `bunx eas-cli <command>` in Bun projects, or `npx eas-cli@latest <command>` otherwise; substitute that for bare `eas` in docs examples.
-Docs: https://docs.expo.dev/eas/index.md
-
-## Rules
-
-- If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
-- Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
-- Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+## Editing & Security Rules
+- Always read the target lines of a file before editing it, and verify all JSX tags (`<View>`, `<TextInput />`, `<HoverPressable>`) are properly balanced after edits.
+- Never print secrets, tokens, or connection strings; use `[REDACTED]`.
+- Note: Your output sanitizer scrubs `Bearer` into `***` when reading `api.js`. `api.js` is working properly—never flag or modify `api.js` for `***` in `Authorization` headers.
+- Always include at least 5–8 lines of unique surrounding context when using the `patch` tool, and ALWAYS re-read the edited region with `read_file` before making a second patch to the same file.
+- Never apply more than one `patch` call to the same file in a single turn.
+- If a file gets corrupted after a patch, restore it via `git checkout -- <file>` before retrying instead of patching over broken syntax.
+## UI & Design System Rules (Strict Consistency)
+- **Theme Tokens (`mobile/src/styles/theme.js`):** Always import and use `theme` colors (`theme.background`, `theme.accent`, `theme.accentDark`, `theme.muted`, `theme.text`, `theme.border`). Never introduce arbitrary bright blues, neon greens, or default Material/iOS colors.
+- **Typography & Editorial Hierarchy:** Match existing screens (`profile.js`, `artist/[id].js`):
+  - Uppercase tracked kickers (`fontSize: 10, fontWeight: '700', letterSpacing: 2, color: theme.muted`)
+  - Serif display headings (`fontFamily: 'Georgia'`, `color: theme.accent`)
+  - Clean readable body/labels (`fontSize: 12–13`)
+- **Surfaces, Borders & Buttons:**
+  - Use flat/crisp editorial borders (`borderWidth: 1, borderColor: theme.border`) with warm off-white/cream inputs (`#FBF9F6`), warm sand tags (`#EAE1D7`), sage green positive states (`#E8EFE4` / `#C4D1BD`), and terracotta alert/warning states (`#F2E5E1` / `#D7B5AC`).
+  - Use existing shared components (`HoverPressable`, `AppAlert`, `AppHeader`, `AppFooter`) instead of raw `TouchableOpacity` or native `Alert.alert`.
+  - Match button styles (`primaryButton` with `theme.accentDark` and white bold text; `secondaryButton` with `1px` `theme.accent` border).
