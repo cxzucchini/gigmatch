@@ -36,12 +36,32 @@ const isCloudinaryConfigured = () => Boolean(
 
 const configureCloudinary = () => {
   if (process.env.CLOUDINARY_URL) {
-    cloudinary.config(process.env.CLOUDINARY_URL);
+    const cleanUrl = process.env.CLOUDINARY_URL.trim();
+    const match = cleanUrl.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
+    console.log('[cloudinary-debug] mode=url', {
+      hasUrl: true,
+      parsedCloud: match?.[3] || 'unparsed',
+      parsedKey: match?.[1] || 'unparsed',
+      parsedSecretHint: match?.[2]
+        ? `${match[2].slice(0, 3)}...${match[2].slice(-3)} (len=${match[2].length})`
+        : 'unparsed',
+    });
+    cloudinary.config(cleanUrl);
   } else {
+    const cloudName = (process.env.CLOUDINARY_CLOUD_NAME || '').trim();
+    const apiKey = (process.env.CLOUDINARY_API_KEY || '').trim();
+    const apiSecret = (process.env.CLOUDINARY_API_SECRET || '').trim();
+    console.log('[cloudinary-debug] mode=trio', {
+      cloudName,
+      apiKey,
+      secretHint: apiSecret
+        ? `${apiSecret.slice(0, 3)}...${apiSecret.slice(-3)} (len=${apiSecret.length})`
+        : 'missing',
+    });
     cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
+      cloud_name: cloudName,
+      api_key: apiKey,
+      api_secret: apiSecret,
     });
   }
 };
