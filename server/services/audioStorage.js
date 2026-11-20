@@ -1,8 +1,12 @@
+const os = require('os');
 const path = require('path');
 const fs = require('fs');
 const cloudinary = require('cloudinary').v2;
 
-const uploadsDir = path.join(__dirname, '..', 'uploads');
+const uploadsDir = process.env.VERCEL
+  ? path.join(os.tmpdir(), 'uploads')
+  : path.join(__dirname, '..', 'uploads');
+
 fs.mkdirSync(uploadsDir, { recursive: true });
 
 // mimetype -> file extension allowlist (browser values for mp3/wav/m4a + friends)
