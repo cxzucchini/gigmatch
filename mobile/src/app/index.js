@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(20, 14, 11, 0.72)',
   },
   compactEyebrow: {
-    color: '#F8F3EC',
+    color: '#E4C9A9',
     fontSize: 11,
     letterSpacing: 2,
     fontWeight: '700',

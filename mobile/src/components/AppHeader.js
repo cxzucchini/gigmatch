@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   brandName: { color: theme.accent, fontFamily: SERIF_FONT, fontSize: 24 },
   mobileBrand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   mobileBrandName: { color: theme.accent, fontFamily: SERIF_FONT, fontSize: 20 },
-  brandTag: { color: theme.accentDark || theme.text, fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  brandTag: { color: theme.muted, fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
   links: { alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: '100%', paddingVertical: 6 },
   desktopLinks: { flexDirection: 'row', alignItems: 'center', gap: 24, marginLeft: 'auto', paddingLeft: 24, paddingVertical: 0, minWidth: 0 },
   linkWrap: { minHeight: 36, justifyContent: 'center', alignItems: 'center' },
