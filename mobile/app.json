@@ -48,12 +48,19 @@
       },
       "package": "com.gigmatch.app",
       "permissions": [
+        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
       "output": "single",
       "favicon": "./assets/favicon.png"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/39945a0a-478a-463a-a393-c5651a4278b0"
     }
   }
 }
