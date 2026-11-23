@@ -30,6 +30,12 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  // Show/hide password toggles
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+
   // OTP & password reset states
   const [otpCode, setOtpCode] = useState('');
   const [resetSent, setResetSent] = useState(false);
@@ -50,6 +56,10 @@ export default function AuthScreen() {
   const switchMode = (nextMode) => {
     setError('');
     setStatusMessage('');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+    setShowNewPassword(false);
+    setShowConfirmNewPassword(false);
     setMode(nextMode);
   };
 
@@ -118,7 +128,6 @@ export default function AuthScreen() {
     setSubmitting(true);
     try {
       await completeEmailVerification(email.trim().toLowerCase(), cleanCode);
-      // Required step: every new account must verify a government ID before continuing.
       router.replace('/verify-id');
     } catch (requestError) {
       setError(requestError.message);
@@ -201,7 +210,7 @@ export default function AuthScreen() {
       setConfirmNewPassword('');
       setOtpCode('');
       setResetSent(false);
-      setMode('signin');
+      switchMode('signin');
       setStatusMessage('Password updated. Sign in with your new password.');
     } catch (requestError) {
       setError(requestError.message);
@@ -327,30 +336,50 @@ export default function AuthScreen() {
                   />
 
                   <Text style={styles.label}>New password</Text>
-                  <TextInput
-                    value={newPassword}
-                    onChangeText={setNewPassword}
-                    placeholder="At least 8 characters"
-                    placeholderTextColor={theme.muted}
-                    accessibilityLabel="New password"
-                    secureTextEntry
-                    autoComplete="new-password"
-                    style={styles.input}
-                  />
+                  <View style={styles.passwordWrap}>
+                    <TextInput
+                      value={newPassword}
+                      onChangeText={setNewPassword}
+                      placeholder="At least 8 characters"
+                      placeholderTextColor={theme.muted}
+                      accessibilityLabel="New password"
+                      secureTextEntry={!showNewPassword}
+                      autoComplete="new-password"
+                      style={styles.passwordInput}
+                    />
+                    <HoverPressable
+                      accessibilityRole="button"
+                      accessibilityLabel={showNewPassword ? 'Hide new password' : 'Show new password'}
+                      onPress={() => setShowNewPassword((prev) => !prev)}
+                      style={styles.togglePasswordBtn}
+                    >
+                      <Text style={styles.togglePasswordText}>{showNewPassword ? 'Hide' : 'Show'}</Text>
+                    </HoverPressable>
+                  </View>
 
                   <Text style={styles.label}>Confirm new password</Text>
-                  <TextInput
-                    value={confirmNewPassword}
-                    onChangeText={setConfirmNewPassword}
-                    placeholder="Enter new password again"
-                    placeholderTextColor={theme.muted}
-                    accessibilityLabel="Confirm new password"
-                    secureTextEntry
-                    autoComplete="new-password"
-                    returnKeyType="go"
-                    onSubmitEditing={handleResetPassword}
-                    style={styles.input}
-                  />
+                  <View style={styles.passwordWrap}>
+                    <TextInput
+                      value={confirmNewPassword}
+                      onChangeText={setConfirmNewPassword}
+                      placeholder="Enter new password again"
+                      placeholderTextColor={theme.muted}
+                      accessibilityLabel="Confirm new password"
+                      secureTextEntry={!showConfirmNewPassword}
+                      autoComplete="new-password"
+                      returnKeyType="go"
+                      onSubmitEditing={handleResetPassword}
+                      style={styles.passwordInput}
+                    />
+                    <HoverPressable
+                      accessibilityRole="button"
+                      accessibilityLabel={showConfirmNewPassword ? 'Hide confirm new password' : 'Show confirm new password'}
+                      onPress={() => setShowConfirmNewPassword((prev) => !prev)}
+                      style={styles.togglePasswordBtn}
+                    >
+                      <Text style={styles.togglePasswordText}>{showConfirmNewPassword ? 'Hide' : 'Show'}</Text>
+                    </HoverPressable>
+                  </View>
 
                   <HoverPressable
                     onPress={handleResetPassword}
@@ -457,37 +486,59 @@ export default function AuthScreen() {
                 onSubmitEditing={() => passwordRef.current?.focus()}
                 style={styles.input}
               />
+
               <Text style={styles.label}>Password</Text>
-              <TextInput
-                ref={passwordRef}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="At least 8 characters"
-                placeholderTextColor={theme.muted}
-                accessibilityLabel="Password"
-                secureTextEntry
-                autoComplete={isRegistering ? 'new-password' : 'current-password'}
-                returnKeyType={isRegistering ? 'next' : 'go'}
-                blurOnSubmit={!isRegistering}
-                onSubmitEditing={() => (isRegistering ? confirmPasswordRef.current?.focus() : handleAuthSubmit())}
-                style={styles.input}
-              />
+              <View style={styles.passwordWrap}>
+                <TextInput
+                  ref={passwordRef}
+                  value={password}
+                  onChangeText={setPassword}
+                  placeholder="At least 8 characters"
+                  placeholderTextColor={theme.muted}
+                  accessibilityLabel="Password"
+                  secureTextEntry={!showPassword}
+                  autoComplete={isRegistering ? 'new-password' : 'current-password'}
+                  returnKeyType={isRegistering ? 'next' : 'go'}
+                  blurOnSubmit={!isRegistering}
+                  onSubmitEditing={() => (isRegistering ? confirmPasswordRef.current?.focus() : handleAuthSubmit())}
+                  style={styles.passwordInput}
+                />
+                <HoverPressable
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                  onPress={() => setShowPassword((prev) => !prev)}
+                  style={styles.togglePasswordBtn}
+                >
+                  <Text style={styles.togglePasswordText}>{showPassword ? 'Hide' : 'Show'}</Text>
+                </HoverPressable>
+              </View>
+
               {isRegistering ? (
                 <>
                   <Text style={styles.label}>Confirm password</Text>
-                  <TextInput
-                    ref={confirmPasswordRef}
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    placeholder="Enter your password again"
-                    placeholderTextColor={theme.muted}
-                    accessibilityLabel="Confirm password"
-                    secureTextEntry
-                    autoComplete="new-password"
-                    returnKeyType="go"
-                    onSubmitEditing={handleAuthSubmit}
-                    style={styles.input}
-                  />
+                  <View style={styles.passwordWrap}>
+                    <TextInput
+                      ref={confirmPasswordRef}
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      placeholder="Enter your password again"
+                      placeholderTextColor={theme.muted}
+                      accessibilityLabel="Confirm password"
+                      secureTextEntry={!showConfirmPassword}
+                      autoComplete="new-password"
+                      returnKeyType="go"
+                      onSubmitEditing={handleAuthSubmit}
+                      style={styles.passwordInput}
+                    />
+                    <HoverPressable
+                      accessibilityRole="button"
+                      accessibilityLabel={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                      onPress={() => setShowConfirmPassword((prev) => !prev)}
+                      style={styles.togglePasswordBtn}
+                    >
+                      <Text style={styles.togglePasswordText}>{showConfirmPassword ? 'Hide' : 'Show'}</Text>
+                    </HoverPressable>
+                  </View>
                 </>
               ) : null}
 
@@ -553,6 +604,10 @@ const styles = StyleSheet.create({
   subtitle: { color: theme.muted, fontSize: 13, lineHeight: 20, marginTop: 8, marginBottom: 18 },
   label: { color: theme.accent, fontSize: 12, fontWeight: '600', marginBottom: 7, marginTop: 12 },
   input: { borderWidth: 1, borderColor: theme.border, backgroundColor: '#FBF9F6', paddingHorizontal: 13, paddingVertical: 12, color: theme.text, minHeight: 48 },
+  passwordWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: theme.border, backgroundColor: '#FBF9F6', minHeight: 48 },
+  passwordInput: { flex: 1, paddingHorizontal: 13, paddingVertical: 12, color: theme.text, minHeight: 48 },
+  togglePasswordBtn: { paddingHorizontal: 14, minHeight: 48, justifyContent: 'center', alignItems: 'center' },
+  togglePasswordText: { color: theme.accent, fontSize: 11, fontWeight: '700', letterSpacing: 0.4 },
   inputMuted: { opacity: 0.7 },
   otpInput: { letterSpacing: 8, fontSize: 20, fontWeight: '700', textAlign: 'center' },
   roleRow: { flexDirection: 'row', gap: 10 },
