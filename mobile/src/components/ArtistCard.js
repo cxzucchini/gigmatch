@@ -7,6 +7,37 @@ import HoverPressable from './HoverPressable';
 const SCALLOP_PATH =
   'M 50 7 C 54 7, 57 12, 61 13 C 65 14, 70 11, 74 13 C 77 15, 78 21, 81 24 C 84 27, 90 28, 92 31 C 94 35, 91 40, 92 44 C 93 48, 98 51, 98 55 C 98 59, 93 62, 92 66 C 91 70, 94 75, 92 79 C 90 82, 84 83, 81 86 C 78 89, 77 95, 74 97 C 70 99, 65 96, 61 97 C 57 98, 54 103, 50 103 C 46 103, 43 98, 39 97 C 35 96, 30 99, 26 97 C 23 95, 22 89, 19 86 C 16 83, 10 82, 8 79 C 6 75, 9 70, 8 66 C 7 62, 2 59, 2 55 C 2 51, 7 48, 8 44 C 9 40, 6 35, 8 31 C 10 28, 16 27, 19 24 C 22 21, 23 15, 26 13 C 30 11, 35 14, 39 13 C 43 12, 46 7, 50 7 Z';
 
+function formatDistance(artist, explicitDistance) {
+  const raw =
+    explicitDistance ??
+    artist?.distance ??
+    artist?.distanceKm ??
+    artist?.distance_km ??
+    artist?.distanceInKm;
+
+  if (raw !== null && raw !== undefined && raw !== '') {
+    const num = typeof raw === 'number' ? raw : Number(raw);
+    if (Number.isFinite(num)) {
+      return num < 1
+        ? `${Math.round(num * 1000)} m away`
+        : `${num.toFixed(1)} km away`;
+    }
+    return String(raw);
+  }
+
+  const meters = artist?.distanceMeters ?? artist?.distance_m;
+  if (meters !== null && meters !== undefined && meters !== '') {
+    const numMeters = typeof meters === 'number' ? meters : Number(meters);
+    if (Number.isFinite(numMeters)) {
+      return numMeters < 1000
+        ? `${Math.round(numMeters)} m away`
+        : `${(numMeters / 1000).toFixed(1)} km away`;
+    }
+  }
+
+  return null;
+}
+
 function VerifiedStickerBadge({ isVerified }) {
   if (Platform.OS === 'web') {
     const shadowColor = isVerified ? '#35251D' : '#C2B6AA';
@@ -85,7 +116,7 @@ function VerifiedStickerBadge({ isVerified }) {
   );
 }
 
-export default function ArtistCard({ artist }) {
+export default function ArtistCard({ artist, showDistance = false, distance }) {
   const router = useRouter();
   const [showVerifiedTip, setShowVerifiedTip] = useState(false);
   const [badgeHovered, setBadgeHovered] = useState(false);
@@ -96,6 +127,8 @@ export default function ArtistCard({ artist }) {
       artist.verificationStatus === 'approved' ||
       artist.verificationStatus === 'verified'
   );
+
+  const distanceLabel = showDistance ? formatDistance(artist, distance) : null;
 
   const handleBadgeToggle = (e) => {
     if (e?.stopPropagation) e.stopPropagation();
@@ -183,12 +216,22 @@ export default function ArtistCard({ artist }) {
           {artist.bio || 'Available for live events, private parties, and acoustic sets.'}
         </Text>
 
-        {/* Compact Location & Equipment Pills */}
+        {/* Compact Location, Distance & Equipment Pills */}
         <View style={styles.badgesRow}>
-          <View style={styles.locationPill}>
-            <Text style={styles.locationText} numberOfLines={1}>
-              📍 {artist.location}
-            </Text>
+          <View style={styles.locationRow}>
+            <View style={styles.locationPill}>
+              <Text style={styles.locationText} numberOfLines={1}>
+                📍 {artist.location}
+              </Text>
+            </View>
+
+            {distanceLabel ? (
+              <View style={styles.distancePill}>
+                <Text style={styles.distanceText} numberOfLines={1}>
+                  📏 {distanceLabel}
+                </Text>
+              </View>
+            ) : null}
           </View>
 
           {artist.equipment ? (
@@ -399,6 +442,12 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: 12,
   },
+  locationRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
 
   locationPill: {
     flexShrink: 1,
@@ -415,6 +464,23 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: theme.muted,
+  },
+
+  distancePill: {
+    flexShrink: 0,
+    borderWidth: 1,
+    borderColor: 'rgba(53, 37, 29, 0.22)',
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    backgroundColor: '#EAE1D7',
+  },
+  distanceText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    color: theme.accent,
   },
 
   equipmentPill: {

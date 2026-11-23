@@ -8,13 +8,33 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "extra": {
-      "apiUrl": "https://gigmatch-orcin.vercel.app/api"
+      "apiUrl": "https://gigmatch-orcin.vercel.app/api",
+      "router": {
+        "root": "src/app",
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "39945a0a-478a-463a-a393-c5651a4278b0"
+      }
     },
     "plugins": [
-      ["expo-router", { "root": "src/app" }],
+      [
+        "expo-router",
+        {
+          "root": "src/app"
+        }
+      ],
       "expo-notifications",
-      ["expo-image-picker", {}],
-      ["expo-document-picker", {}]
+      [
+        "expo-image-picker",
+        {}
+      ],
+      [
+        "expo-document-picker",
+        {}
+      ]
     ],
     "ios": {
       "supportsTablet": true
@@ -26,7 +46,10 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.gigmatch.app"
+      "package": "com.gigmatch.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "single",

@@ -1,10 +1,22 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, useWindowDimensions, Modal, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, useWindowDimensions, Modal, TouchableOpacity, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { theme } from '../styles/theme';
 import { useAuth } from '../context/AuthContext';
 import { useUnreadNotifications } from './InAppNotificationAlert';
 import HoverPressable from './HoverPressable';
+
+const SERIF_FONT = Platform.select({
+  ios: 'Georgia',
+  android: 'serif',
+  default: 'Georgia',
+});
+
+const SANS_FONT = Platform.select({
+  ios: 'Arial',
+  android: 'sans-serif',
+  default: 'Arial, sans-serif',
+});
 
 export default function AppHeader({ active }) {
   const router = useRouter();
@@ -23,7 +35,7 @@ export default function AppHeader({ active }) {
     ]),
     ...(user ? [{ label: 'Bookings', route: '/bookings' }] : []),
     ...(user ? [{ label: 'Messages', route: '/messages' }] : []),
-    ...(user ? [{ label: 'Notifications', route: '/notifications', badge: unreadCount }] : []),
+    ...(user && desktop ? [{ label: 'Notifications', route: '/notifications', badge: unreadCount }] : []),
     ...(user?.role === 'musician' ? [{ label: 'My profile', route: '/musician/profile' }] : []),
     ...(user?.role === 'admin' ? [{ label: 'Admin', route: '/admin' }] : []),
   ];
@@ -51,6 +63,33 @@ export default function AppHeader({ active }) {
     </HoverPressable>
   );
 
+  const mobileRightActions = (
+    <View style={styles.mobileRightGroup}>
+      {user ? (
+        // Inside mobileRightActions:
+        <TouchableOpacity
+       onPress={() => router.push('/notifications')}
+       style={[styles.bellButton, active === 'Notifications' && styles.bellButtonActive]}
+       accessibilityRole="button"
+       accessibilityLabel={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+     >
+       <View style={styles.bellIcon}>
+         <View style={styles.bellTopKnob} />
+         <View style={styles.bellDome} />
+         <View style={styles.bellBase} />
+         <View style={styles.bellClapper} />
+       </View>
+       {Boolean(unreadCount) && (
+         <View style={styles.bellBadge}>
+           <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
+         </View>
+       )}
+     </TouchableOpacity>
+      ) : null}
+      {accountButton}
+    </View>
+  );
+
   return (
     <View style={[styles.container, desktop && styles.desktopContainer]}>
       <View style={[styles.mainNavRow, desktop && styles.mainNavRowDesktop]}>
@@ -67,28 +106,28 @@ export default function AppHeader({ active }) {
               <Text style={styles.brandTag}>LIVE MUSIC, FOUND</Text>
             </HoverPressable>
             <View style={[styles.links, styles.desktopLinks]}>
-            {links.map((link) => (
-              <HoverPressable
-                key={link.label}
-                accessibilityRole="link"
-                accessibilityLabel={link.label}
-                onPress={() => router.push(link.route)}
-                style={styles.linkWrap}
-                hoverStyle={styles.linkHovered}
-              >
-                <View style={styles.linkInner}>
-                  <Text style={[styles.link, active === link.label && styles.activeLink]}>{link.label}</Text>
-                  {Boolean(link.badge) && (
-                    <View style={styles.badge}>
-                      <Text style={styles.badgeText}>{link.badge > 9 ? '9+' : String(link.badge)}</Text>
-                    </View>
-                  )}
-                </View>
-                {active === link.label && <View style={styles.activeRule} />}
-              </HoverPressable>
-            ))}
-            {accountButton}
-          </View>
+              {links.map((link) => (
+                <HoverPressable
+                  key={link.label}
+                  accessibilityRole="link"
+                  accessibilityLabel={link.label}
+                  onPress={() => router.push(link.route)}
+                  style={styles.linkWrap}
+                  hoverStyle={styles.linkHovered}
+                >
+                  <View style={styles.linkInner}>
+                    <Text style={[styles.link, active === link.label && styles.activeLink]}>{link.label}</Text>
+                    {Boolean(link.badge) && (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{link.badge > 9 ? '9+' : String(link.badge)}</Text>
+                      </View>
+                    )}
+                  </View>
+                  {active === link.label && <View style={styles.activeRule} />}
+                </HoverPressable>
+              ))}
+              {accountButton}
+            </View>
           </>
         ) : (
           <View style={styles.mobileWrapper}>
@@ -114,7 +153,7 @@ export default function AppHeader({ active }) {
                 <Text style={styles.mobileBrandName}>Gigmatch</Text>
               </HoverPressable>
             </View>
-            {accountButton}
+            {mobileRightActions}
           </View>
         )}
       </View>
@@ -185,9 +224,9 @@ const styles = StyleSheet.create({
   brand: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 4, flex: 1, minWidth: 80 },
   brandHovered: { opacity: 0.82 },
   desktopBrand: { marginBottom: 0 },
-  brandName: { color: theme.accent, fontFamily: 'Georgia', fontSize: 24 },
+  brandName: { color: theme.accent, fontFamily: SERIF_FONT, fontSize: 24 },
   mobileBrand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  mobileBrandName: { color: theme.accent, fontFamily: 'Georgia', fontSize: 20 },
+  mobileBrandName: { color: theme.accent, fontFamily: SERIF_FONT, fontSize: 20 },
   brandTag: { color: theme.muted, fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
   links: { alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: '100%', paddingVertical: 6 },
   desktopLinks: { flexDirection: 'row', alignItems: 'center', gap: 24, marginLeft: 'auto', paddingLeft: 24, paddingVertical: 0, minWidth: 0 },
@@ -200,32 +239,59 @@ const styles = StyleSheet.create({
   activeLink: { color: theme.accent, fontWeight: '700' },
   activeRule: { height: 2, backgroundColor: theme.accent, width: '100%', marginTop: 3 },
   bookButton: {
-    minHeight: 40,
+    minHeight: 38,
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 18,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
     backgroundColor: theme.accent,
     borderRadius: 20,
   },
   bookButtonHovered: { backgroundColor: theme.accentDark, transform: [{ translateY: -1 }], shadowColor: '#35251D', shadowOpacity: 0.14, shadowRadius: 4, shadowOffset: { width: 0, height: 2 }, elevation: 2 },
   bookButtonPressed: { opacity: 0.88, transform: [{ translateY: 0 }] },
-  bookTextSize: { color: '#fff', fontSize: 12, fontFamily: 'Arial', fontWeight: '600', letterSpacing: 0.25 },
-  accountButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  bookTextSize: { color: '#fff', fontSize: 12, fontFamily: SANS_FONT, fontWeight: '600', letterSpacing: 0.25 },
+  accountButtonContent: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   profileIcon: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden', paddingTop: 2, gap: 1 },
   profileHead: { width: 5, height: 5, borderRadius: 2, backgroundColor: theme.accent },
   profileBody: { width: 9, height: 6, borderTopLeftRadius: 5, borderTopRightRadius: 5, backgroundColor: theme.accent },
-  
-  // Mobile hamburger menu
-  mobileWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'space-between' },
-  mobileLeftGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  hamburgerButton: { padding: 10, zIndex: 10, borderRadius: 8 },
+
+  // Mobile header & drawer
+  mobileWrapper: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'space-between' },
+  mobileLeftGroup: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
+  mobileRightGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  bellButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F2EE',
+    borderWidth: 1,
+    borderColor: '#DED4C9',
+  },
+  bellButtonActive: {
+    borderColor: theme.accent,
+    backgroundColor: '#EAE1D7',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: '#8D3A2D',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hamburgerButton: { padding: 8, zIndex: 10, borderRadius: 8 },
   hamburgerIcon: { width: 20, height: 14, justifyContent: 'space-between', alignItems: 'center' },
   hamburgerLineTop: { width: 20, height: 1.75, backgroundColor: '#4A3525', borderRadius: 0.875 },
   hamburgerLineMid: { width: 20, height: 1.75, backgroundColor: '#4A3525', borderRadius: 0.875 },
   hamburgerLineBottom: { width: 20, height: 1.75, backgroundColor: '#4A3525', borderRadius: 0.875 },
   mobileAccountButton: { marginLeft: 4 },
   mobileNav: { flex: 1, minWidth: 80 },
-  
+
   // Modal drawer
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-start', alignItems: 'flex-end' },
   drawerContent: { width: '80%', backgroundColor: theme.background, height: '100%', borderLeftWidth: 1, borderLeftColor: '#DED4C9' },
@@ -241,4 +307,38 @@ const styles = StyleSheet.create({
   drawerFooter: { padding: 16, borderTopWidth: 1, borderTopColor: 'rgba(222,212,201,0.2)', backgroundColor: theme.background },
   drawerGetStartedButton: { alignSelf: 'center', paddingHorizontal: 24, paddingVertical: 10, backgroundColor: theme.accent, borderRadius: 20 },
   drawerGetStartedText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
+  bellIcon: {
+width: 16,
+height: 17,
+alignItems: 'center',
+justifyContent: 'flex-start',
+},
+bellTopKnob: {
+width: 3,
+height: 2,
+borderRadius: 1,
+backgroundColor: theme.accent,
+},
+bellDome: {
+width: 11,
+height: 10,
+borderTopLeftRadius: 6,
+borderTopRightRadius: 6,
+backgroundColor: theme.accent,
+},
+bellBase: {
+width: 14,
+height: 2,
+borderRadius: 1,
+backgroundColor: theme.accent,
+marginTop: -1,
+},
+bellClapper: {
+width: 4,
+height: 2.5,
+borderBottomLeftRadius: 2,
+borderBottomRightRadius: 2,
+backgroundColor: theme.accent,
+marginTop: 1,
+},
 });

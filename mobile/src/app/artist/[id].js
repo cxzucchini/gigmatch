@@ -19,6 +19,12 @@ import { getUpcomingDates } from '../../utils/availability';
 const SCALLOP_PATH =
   'M 50 7 C 54 7, 57 12, 61 13 C 65 14, 70 11, 74 13 C 77 15, 78 21, 81 24 C 84 27, 90 28, 92 31 C 94 35, 91 40, 92 44 C 93 48, 98 51, 98 55 C 98 59, 93 62, 92 66 C 91 70, 94 75, 92 79 C 90 82, 84 83, 81 86 C 78 89, 77 95, 74 97 C 70 99, 65 96, 61 97 C 57 98, 54 103, 50 103 C 46 103, 43 98, 39 97 C 35 96, 30 99, 26 97 C 23 95, 22 89, 19 86 C 16 83, 10 82, 8 79 C 6 75, 9 70, 8 66 C 7 62, 2 59, 2 55 C 2 51, 7 48, 8 44 C 9 40, 6 35, 8 31 C 10 28, 16 27, 19 24 C 22 21, 23 15, 26 13 C 30 11, 35 14, 39 13 C 43 12, 46 7, 50 7 Z';
 
+const SERIF_FONT = Platform.select({
+  ios: 'Georgia',
+  android: 'serif',
+  default: 'Georgia',
+});
+
 function VerifiedStickerBadge({ isVerified }) {
   if (Platform.OS === 'web') {
     const patternId = isVerified ? 'gm-detail-gold-stripes' : 'gm-detail-muted-fill';
@@ -326,240 +332,242 @@ export default function ArtistDetailScreen() {
   }
 
   return (
-      <SafeAreaView style={styles.safeArea}>
-        <AppHeader active="Discover" />
-        <ScrollView contentContainerStyle={styles.container}>
-          <View style={styles.topBar}>
-            <Pressable onPress={handleBack}>
-              <Text style={styles.back}>← Back</Text>
-            </Pressable>
-          </View>
+    <SafeAreaView style={styles.safeArea}>
+      <AppHeader active="Discover" />
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.topBar}>
+          <Pressable onPress={handleBack}>
+            <Text style={styles.back}>← Back</Text>
+          </Pressable>
+        </View>
 
-          <View style={styles.heroBanner}>
+        <View style={styles.heroBanner}>
+          {Platform.OS === 'web' && artist.image ? (
             <Image
               source={{ uri: artist.image }}
               blurRadius={18}
               style={styles.heroBackdrop}
             />
-            <View style={styles.heroBackdropShade} />
-            <Image
-              source={{ uri: artist.image }}
-              resizeMode="contain"
-              style={styles.heroImage}
-            />
-          </View>
+          ) : null}
+          {Platform.OS === 'web' ? <View style={styles.heroBackdropShade} /> : null}
+          <Image
+            source={{ uri: artist.image }}
+            resizeMode="contain"
+            style={styles.heroImage}
+          />
+        </View>
 
-          <View style={styles.metaRow}>
-            {artist.genre
-              .split(/[/,]/)
-              .map((g) => g.trim())
-              .filter(Boolean)
-              .map((genreItem) => (
-                <View key={genreItem} style={styles.chip}>
-                  <Text style={styles.chipText}>{genreItem.toUpperCase()}</Text>
+        <View style={styles.metaRow}>
+          {artist.genre
+            .split(/[/,]/)
+            .map((g) => g.trim())
+            .filter(Boolean)
+            .map((genreItem) => (
+              <View key={genreItem} style={styles.chip}>
+                <Text style={styles.chipText}>{genreItem.toUpperCase()}</Text>
+              </View>
+            ))}
+        </View>
+
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{artist.name.toUpperCase()}</Text>
+
+          <View
+            style={styles.verifiedWrapper}
+            {...(Platform.OS === 'web'
+              ? {
+                  onMouseEnter: () => {
+                    setBadgeHovered(true);
+                    setShowVerifiedTip(true);
+                  },
+                  onMouseLeave: () => {
+                    setBadgeHovered(false);
+                    setShowVerifiedTip(false);
+                  },
+                }
+              : {})}
+          >
+            <Pressable
+              onPress={() => setShowVerifiedTip((prev) => !prev)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={
+                isVerified
+                  ? 'Verified artist badge. Tap or hover for details.'
+                  : 'Profile verification status. Tap or hover for details.'
+              }
+              style={({ pressed }) => [
+                styles.stickerButton,
+                badgeHovered && styles.stickerHovered,
+                pressed && styles.stickerPressed,
+              ]}
+            >
+              <VerifiedStickerBadge isVerified={isVerified} />
+            </Pressable>
+
+            {showVerifiedTip ? (
+              <View style={styles.tooltipContainer} pointerEvents="none">
+                <View style={styles.tooltipCard}>
+                  <Text style={styles.tooltipEyebrow}>{verificationDetails.eyebrow}</Text>
+                  <Text style={styles.tooltipBody}>{verificationDetails.body}</Text>
                 </View>
-              ))}
+                <View style={styles.tooltipArrow} />
+              </View>
+            ) : null}
           </View>
+        </View>
 
-          <View style={styles.nameRow}>
-            <Text style={styles.name}>{artist.name.toUpperCase()}</Text>
+        <View style={styles.ratingRow}>
+          <Text style={styles.star}>★</Text>
+          <Text style={styles.ratingText}>{artist.rating ? `${artist.rating.toFixed(1)}` : 'New artist'}</Text>
+          <Text style={styles.divider}>|</Text>
+          <Text style={styles.location}>{artist.location}</Text>
+        </View>
 
-            <View
-                          style={styles.verifiedWrapper}
-                          {...(Platform.OS === 'web'
-                          ? {
-                              onMouseEnter: () => {
-                                setBadgeHovered(true);
-                                setShowVerifiedTip(true);
-                              },
-                              onMouseLeave: () => {
-                                setBadgeHovered(false);
-                                setShowVerifiedTip(false);
-                              },
-                            }
-                          : {})}
-                        >
-                          <Pressable
-                            onPress={() => setShowVerifiedTip((prev) => !prev)}
-                            hitSlop={10}
-                            accessibilityRole="button"
-                            accessibilityLabel={
-                              isVerified
-                                ? 'Verified artist badge. Tap or hover for details.'
-                                : 'Profile verification status. Tap or hover for details.'
-                            }
-                            style={({ pressed }) => [
-                              styles.stickerButton,
-                              badgeHovered && styles.stickerHovered,
-                              pressed && styles.stickerPressed,
-                            ]}
-                          >
-                            <VerifiedStickerBadge isVerified={isVerified} />
-                          </Pressable>
-
-                          {showVerifiedTip ? (
-                            <View style={styles.tooltipContainer} pointerEvents="none">
-                              <View style={styles.tooltipCard}>
-                                <Text style={styles.tooltipEyebrow}>{verificationDetails.eyebrow}</Text>
-                                <Text style={styles.tooltipBody}>{verificationDetails.body}</Text>
-                              </View>
-                              <View style={styles.tooltipArrow} />
-                            </View>
-                          ) : null}
-                        </View>
+        <View style={styles.priceBox}>
+          <Text style={styles.priceLabel}>Estimated price</Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.price}>₱{artist.price.toLocaleString()}+ per set / 45 mins</Text>
           </View>
-
-          <View style={styles.ratingRow}>
-            <Text style={styles.star}>★</Text>
-            <Text style={styles.ratingText}>{artist.rating ? `${artist.rating.toFixed(1)}` : 'New artist'}</Text>
-            <Text style={styles.divider}>|</Text>
-            <Text style={styles.location}>{artist.location}</Text>
+          <View style={styles.equipmentRow}>
+            <Text style={styles.equipmentLabel}>Equipment:</Text>
+            <Text style={styles.equipmentValue}>{artist.equipment ? '🔊 With Sound Equipment' : '🎤 Artist Only (Venue provides)'}</Text>
           </View>
+        </View>
 
-          <View style={styles.priceBox}>
-            <Text style={styles.priceLabel}>Estimated price</Text>
-            <View style={styles.priceRow}>
-              <Text style={styles.price}>₱{artist.price.toLocaleString()}+ per set / 45 mins</Text>
-            </View>
-            <View style={styles.equipmentRow}>
-              <Text style={styles.equipmentLabel}>Equipment:</Text>
-              <Text style={styles.equipmentValue}>{artist.equipment ? '🔊 With Sound Equipment' : '🎤 Artist Only (Venue provides)'}</Text>
-            </View>
-          </View>
+        <View style={styles.tabsRow}>
+          <Pressable onPress={() => setActiveTab('about')} style={[styles.tab, activeTab === 'about' && styles.tabActive]}><Text style={[styles.tabText, activeTab === 'about' && styles.tabTextActive]}>About</Text></Pressable>
+          <Pressable onPress={() => { setAvailabilityError(''); setAvailabilityLoading(isMongoId(id)); setActiveTab('availability'); }} style={[styles.tab, activeTab === 'availability' && styles.tabActive]}><Text style={[styles.tabText, activeTab === 'availability' && styles.tabTextActive]}>Availability</Text></Pressable>
+        </View>
 
-          <View style={styles.tabsRow}>
-            <Pressable onPress={() => setActiveTab('about')} style={[styles.tab, activeTab === 'about' && styles.tabActive]}><Text style={[styles.tabText, activeTab === 'about' && styles.tabTextActive]}>About</Text></Pressable>
-            <Pressable onPress={() => { setAvailabilityError(''); setAvailabilityLoading(isMongoId(id)); setActiveTab('availability'); }} style={[styles.tab, activeTab === 'availability' && styles.tabActive]}><Text style={[styles.tabText, activeTab === 'availability' && styles.tabTextActive]}>Availability</Text></Pressable>
-          </View>
-
-          {activeTab === 'about' ? (
-            <View style={[styles.infoBox, infoColumns && styles.infoBoxColumns]}>
-              <View style={infoColumns ? styles.infoMainColumn : null}>
-                <Text style={styles.infoLabel}>ABOUT THE ARTIST</Text>
-                <Text style={styles.infoText}>{artist.description}</Text>
-                <View style={styles.detailRow}><Text style={styles.detailLabel}>GENRE</Text><Text style={styles.detailValue}>{artist.genre}</Text></View>
-                <View style={styles.detailRow}><Text style={styles.detailLabel}>BASED IN</Text><Text style={styles.detailValue}>{artist.location}</Text></View>
+        {activeTab === 'about' ? (
+          <View style={[styles.infoBox, infoColumns && styles.infoBoxColumns]}>
+            <View style={infoColumns ? styles.infoMainColumn : null}>
+              <Text style={styles.infoLabel}>ABOUT THE ARTIST</Text>
+              <Text style={styles.infoText}>{artist.description}</Text>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>GENRE</Text><Text style={styles.detailValue}>{artist.genre}</Text></View>
+              <View style={styles.detailRow}><Text style={styles.detailLabel}>BASED IN</Text><Text style={styles.detailValue}>{artist.location}</Text></View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>VERIFICATION</Text>
+                <Text style={styles.detailValue}>
+                  {isVerified
+                    ? '✓ Verified by Gigmatch'
+                    : artist.verificationStatus === 'pending'
+                      ? 'Pending review'
+                      : 'Not yet verified'}
+                </Text>
+              </View>
+              {artist.contactPhone ? (
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>VERIFICATION</Text>
-                  <Text style={styles.detailValue}>
-                    {isVerified
-                      ? '✓ Verified by Gigmatch'
-                      : artist.verificationStatus === 'pending'
-                        ? 'Pending review'
-                        : 'Not yet verified'}
-                  </Text>
+                  <Text style={styles.detailLabel}>CONTACT</Text>
+                  <Pressable
+                    accessibilityRole="link"
+                    accessibilityLabel={`Call ${artist.name}`}
+                    onPress={contactArtist}
+                  >
+                    <Text style={styles.contactValue}>{artist.contactPhone}</Text>
+                  </Pressable>
                 </View>
-                {artist.contactPhone ? (
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>CONTACT</Text>
-                    <Pressable
-                      accessibilityRole="link"
-                      accessibilityLabel={`Call ${artist.name}`}
-                      onPress={contactArtist}
-                    >
-                      <Text style={styles.contactValue}>{artist.contactPhone}</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
-                {socialEntries.length ? (
-                  <View style={styles.socialRow}>
-                    <Text style={styles.detailLabel}>FIND THEM ONLINE</Text>
-                    <View style={styles.socialLinks}>
-                      {socialEntries.map(([platform, url]) => (
-                        <Pressable
-                          key={platform}
-                          accessibilityRole="link"
-                          accessibilityLabel={`Open ${artist.name} on ${platform}`}
-                          onPress={() => openSocialLink(url)}
-                          style={styles.socialPressable}
-                        >
-                          {platform === 'spotify' && <SpotifyIcon style={styles.socialIcon} />}
-                          {platform === 'youtube' && <YoutubeMusicIcon style={styles.socialIcon} />}
-                          {platform === 'facebook' && <FacebookIcon style={styles.socialIcon} />}
-                          {platform === 'tiktok' && <TiktokIcon style={styles.socialIcon} />}
-                          {platform === 'instagram' && <InstagramIcon style={styles.socialIcon} />}
-                          <Text style={styles.socialLinkText}>{platform.toUpperCase()}</Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                ) : null}
-                {artist?.gallery?.length ? (
-                  <View style={styles.galleryRow}>
-                    <Text style={styles.detailLabel}>GALLERY</Text>
-                    <View style={styles.galleryGrid}>
-                      {artist.gallery.map((url, index) => (
-                        <Pressable
-                          key={url}
-                          onPress={() => setLightboxUrl(url)}
-                          accessibilityRole="imagebutton"
-                          accessibilityLabel={`View photo ${index + 1} of ${artist.name}`}
-                          style={({ hovered }) => [styles.galleryTilePressable, hovered ? styles.galleryTileHovered : null]}
-                        >
-                          <Image
-                            source={{ uri: url }}
-                            resizeMode="cover"
-                            accessibilityRole="image"
-                            accessibilityLabel={`${artist.name} gallery photo`}
-                            style={styles.galleryTile}
-                          />
-                        </Pressable>
-                      ))}
-                    </View>
-                  </View>
-                ) : null}
-              </View>
-              <View style={infoColumns ? styles.playlistPanel : styles.playlistPanelStacked}>
-                <Text style={styles.playlistPanelLabel}>PLAYLIST / SAMPLE TRACKS</Text>
-                {playlistTracks.length ? (
-                  playlistTracks.map((track, index) => (
-                    <PlaylistTrackRow
-                      key={`${track.url || 'track'}-${index}`}
-                      track={track}
-                      trackKey={index}
-                      othersPlaying={activeTrackKey !== null && activeTrackKey !== index}
-                      onPlayStart={setActiveTrackKey}
-                    />
-                  ))
-                ) : (
-                  <Text style={styles.playlistEmpty}>This artist has not uploaded sample tracks yet.</Text>
-                )}
-              </View>
-            </View>
-          ) : (
-            <>
-              <Text style={styles.availabilityCopy}>Dates marked unavailable are blocked by the musician. A confirmed booking may limit the available time; requests are checked before submission.</Text>
-              {availabilityError ? <Text accessibilityRole="alert" style={styles.availabilityError}>{availabilityError}</Text> : null}
-              <AppAlert
-                visible={Boolean(availabilityError)}
-                title="Availability unavailable"
-                message={availabilityError}
-                onDismiss={() => setAvailabilityError('')}
-              />
-              {availabilityLoading ? <ActivityIndicator color={theme.accent} /> : (
-                <View style={styles.dateGrid}>
-                  {getUpcomingDates().map(({ dateValue, label }) => {
-                    const blocked = availability.unavailableDates.includes(dateValue);
-                    const hasBooking = availability.bookedDates.includes(dateValue);
-                    return (
+              ) : null}
+              {socialEntries.length ? (
+                <View style={styles.socialRow}>
+                  <Text style={styles.detailLabel}>FIND THEM ONLINE</Text>
+                  <View style={styles.socialLinks}>
+                    {socialEntries.map(([platform, url]) => (
                       <Pressable
-                        key={dateValue}
-                        accessibilityRole="button"
-                        accessibilityState={{ disabled: blocked }}
-                        accessibilityLabel={`${label}, ${blocked ? 'unavailable' : hasBooking ? 'has a confirmed booking' : 'open for requests'}`}
-                        disabled={blocked}
-                        onPress={() => router.push({ pathname: '/booking', params: { artistId: String(artist._id || artist.id), date: dateValue } })}
-                        style={[styles.dateTag, blocked && styles.dateTagBlocked, hasBooking && !blocked && styles.dateTagBooked]}
+                        key={platform}
+                        accessibilityRole="link"
+                        accessibilityLabel={`Open ${artist.name} on ${platform}`}
+                        onPress={() => openSocialLink(url)}
+                        style={styles.socialPressable}
                       >
-                        <Text style={[styles.dateText, blocked && styles.dateTextBlocked]}>{label}</Text>
-                        <Text style={[styles.dateStatus, blocked && styles.dateTextBlocked]}>{blocked ? 'Unavailable' : hasBooking ? 'Ask about time' : 'Open'}</Text>
+                        {platform === 'spotify' && <SpotifyIcon style={styles.socialIcon} />}
+                        {platform === 'youtube' && <YoutubeMusicIcon style={styles.socialIcon} />}
+                        {platform === 'facebook' && <FacebookIcon style={styles.socialIcon} />}
+                        {platform === 'tiktok' && <TiktokIcon style={styles.socialIcon} />}
+                        {platform === 'instagram' && <InstagramIcon style={styles.socialIcon} />}
+                        <Text style={styles.socialLinkText}>{platform.toUpperCase()}</Text>
                       </Pressable>
-                    );
-                  })}
+                    ))}
+                  </View>
                 </View>
+              ) : null}
+              {artist?.gallery?.length ? (
+                <View style={styles.galleryRow}>
+                  <Text style={styles.detailLabel}>GALLERY</Text>
+                  <View style={styles.galleryGrid}>
+                    {artist.gallery.map((url, index) => (
+                      <Pressable
+                        key={url}
+                        onPress={() => setLightboxUrl(url)}
+                        accessibilityRole="imagebutton"
+                        accessibilityLabel={`View photo ${index + 1} of ${artist.name}`}
+                        style={({ hovered }) => [styles.galleryTilePressable, hovered ? styles.galleryTileHovered : null]}
+                      >
+                        <Image
+                          source={{ uri: url }}
+                          resizeMode="cover"
+                          accessibilityRole="image"
+                          accessibilityLabel={`${artist.name} gallery photo`}
+                          style={styles.galleryTile}
+                        />
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
+            </View>
+            <View style={infoColumns ? styles.playlistPanel : styles.playlistPanelStacked}>
+              <Text style={styles.playlistPanelLabel}>PLAYLIST / SAMPLE TRACKS</Text>
+              {playlistTracks.length ? (
+                playlistTracks.map((track, index) => (
+                  <PlaylistTrackRow
+                    key={`${track.url || 'track'}-${index}`}
+                    track={track}
+                    trackKey={index}
+                    othersPlaying={activeTrackKey !== null && activeTrackKey !== index}
+                    onPlayStart={setActiveTrackKey}
+                  />
+                ))
+              ) : (
+                <Text style={styles.playlistEmpty}>This artist has not uploaded sample tracks yet.</Text>
               )}
-              <Pressable onPress={() => router.push({ pathname: '/booking', params: { artistId: String(artist._id || artist.id) } })} style={styles.bookBtn}><Text style={styles.bookText}>Request a Booking</Text></Pressable>
-            </>
+            </View>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.availabilityCopy}>Dates marked unavailable are blocked by the musician. A confirmed booking may limit the available time; requests are checked before submission.</Text>
+            {availabilityError ? <Text accessibilityRole="alert" style={styles.availabilityError}>{availabilityError}</Text> : null}
+            <AppAlert
+              visible={Boolean(availabilityError)}
+              title="Availability unavailable"
+              message={availabilityError}
+              onDismiss={() => setAvailabilityError('')}
+            />
+            {availabilityLoading ? <ActivityIndicator color={theme.accent} /> : (
+              <View style={styles.dateGrid}>
+                {getUpcomingDates().map(({ dateValue, label }) => {
+                  const blocked = availability.unavailableDates.includes(dateValue);
+                  const hasBooking = availability.bookedDates.includes(dateValue);
+                  return (
+                    <Pressable
+                      key={dateValue}
+                      accessibilityRole="button"
+                      accessibilityState={{ disabled: blocked }}
+                      accessibilityLabel={`${label}, ${blocked ? 'unavailable' : hasBooking ? 'has a confirmed booking' : 'open for requests'}`}
+                      disabled={blocked}
+                      onPress={() => router.push({ pathname: '/booking', params: { artistId: String(artist._id || artist.id), date: dateValue } })}
+                      style={[styles.dateTag, blocked && styles.dateTagBlocked, hasBooking && !blocked && styles.dateTagBooked]}
+                    >
+                      <Text style={[styles.dateText, blocked && styles.dateTextBlocked]}>{label}</Text>
+                      <Text style={[styles.dateStatus, blocked && styles.dateTextBlocked]}>{blocked ? 'Unavailable' : hasBooking ? 'Ask about time' : 'Open'}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+            <Pressable onPress={() => router.push({ pathname: '/booking', params: { artistId: String(artist._id || artist.id) } })} style={styles.bookBtn}><Text style={styles.bookText}>Request a Booking</Text></Pressable>
+          </>
         )}
         <AppFooter />
       </ScrollView>
@@ -640,7 +648,7 @@ const styles = StyleSheet.create({
   },
   heroBanner: {
     width: '100%',
-    height: 400,
+    height: 320,
     borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#231712',
@@ -649,13 +657,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 12,
   },
   heroBackdrop: {
     ...StyleSheet.absoluteFillObject,
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
-    transform: [{ scale: 1.08 }],
+    transform: [{ scale: 1.06 }],
   },
   heroBackdropShade: {
     ...StyleSheet.absoluteFillObject,
@@ -664,6 +673,10 @@ const styles = StyleSheet.create({
   heroImage: {
     width: '100%',
     height: '100%',
+    maxWidth: 296,
+    maxHeight: 296,
+    aspectRatio: 1,
+    borderRadius: 10,
   },
   metaRow: {
     flexDirection: 'row',
@@ -707,7 +720,7 @@ const styles = StyleSheet.create({
     color: theme.accent,
     fontSize: 42,
     lineHeight: 46,
-    fontFamily: 'Georgia',
+    fontFamily: SERIF_FONT,
     flexShrink: 1,
   },
   verifiedWrapper: {
@@ -718,7 +731,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 40,
   },
-    stickerButton: {
+  stickerButton: {
     width: 36,
     height: 36,
     alignItems: 'center',
@@ -752,53 +765,53 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   nativeSealIconMuted: {
-      color: '#8C7E73',
-    },
-    tooltipContainer: {
-      position: 'absolute',
-      bottom: 44,
-      left: -16,
-      alignItems: 'flex-start',
-      zIndex: 60,
-    },
-    tooltipCard: {
-      width: 248,
-      backgroundColor: '#231712',
-      borderWidth: 1,
-      borderColor: 'rgba(228, 201, 169, 0.28)',
-      borderRadius: 12,
-      paddingVertical: 10,
-      paddingHorizontal: 12,
-      shadowColor: '#120B08',
-      shadowOpacity: 0.28,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 8,
-    },
-    tooltipEyebrow: {
-      color: '#E4C9A9',
-      fontSize: 9.5,
-      fontWeight: '700',
-      letterSpacing: 1.3,
-      marginBottom: 4,
-    },
-    tooltipBody: {
-      color: '#F3E9DF',
-      fontSize: 11.5,
-      lineHeight: 16,
-    },
-    tooltipArrow: {
-      width: 10,
-      height: 10,
-      backgroundColor: '#231712',
-      borderRightWidth: 1,
-      borderBottomWidth: 1,
-      borderColor: 'rgba(228, 201, 169, 0.28)',
-      transform: [{ rotate: '45deg' }],
-      marginTop: -5,
-      marginLeft: 28,
-    },
-    ratingRow: {
+    color: '#8C7E73',
+  },
+  tooltipContainer: {
+    position: 'absolute',
+    bottom: 44,
+    left: -16,
+    alignItems: 'flex-start',
+    zIndex: 60,
+  },
+  tooltipCard: {
+    width: 248,
+    backgroundColor: '#231712',
+    borderWidth: 1,
+    borderColor: 'rgba(228, 201, 169, 0.28)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    shadowColor: '#120B08',
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  tooltipEyebrow: {
+    color: '#E4C9A9',
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 1.3,
+    marginBottom: 4,
+  },
+  tooltipBody: {
+    color: '#F3E9DF',
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+  tooltipArrow: {
+    width: 10,
+    height: 10,
+    backgroundColor: '#231712',
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(228, 201, 169, 0.28)',
+    transform: [{ rotate: '45deg' }],
+    marginTop: -5,
+    marginLeft: 28,
+  },
+  ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
@@ -844,7 +857,7 @@ const styles = StyleSheet.create({
   price: {
     color: theme.accent,
     fontSize: 30,
-    fontFamily: 'Georgia',
+    fontFamily: SERIF_FONT,
     fontWeight: '700',
   },
   priceRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
@@ -1130,7 +1143,7 @@ const styles = StyleSheet.create({
   scheduleTitle: {
     color: theme.accent,
     fontSize: 24,
-    fontFamily: 'Georgia',
+    fontFamily: SERIF_FONT,
     marginBottom: 18,
   },
   dateGrid: {
@@ -1186,7 +1199,7 @@ const styles = StyleSheet.create({
   },
   notFoundTitle: {
     color: theme.accent,
-    fontFamily: 'Georgia',
+    fontFamily: SERIF_FONT,
     fontSize: 28,
     marginBottom: 8,
   },

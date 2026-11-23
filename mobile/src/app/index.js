@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ImageBackground, TextInput, useWindowDimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ImageBackground, TextInput, useWindowDimensions, ActivityIndicator, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { theme } from '../styles/theme';
@@ -15,6 +15,12 @@ import { normalizeMusician } from '../utils/musician';
 
 const genres = ['Default', 'Jazz', 'Rock', 'RnB', 'Acoustic', 'Pop', 'OPM', 'Reggae', 'Classical'];
 const prices = ['Default', 'High to Low', 'Low to High'];
+
+const SERIF_FONT = Platform.select({
+  ios: 'Georgia',
+  android: 'serif',
+  default: 'Georgia',
+});
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -298,7 +304,11 @@ export default function HomeScreen() {
           {loadingArtists ? <ActivityIndicator color={theme.accent} style={styles.loading} /> : null}
           {filteredArtists.map((artist) => (
             <View key={artist.id} style={[styles.cardWrap, { width: cardWidth }]}>
-              <ArtistCard artist={artist} />
+              <ArtistCard
+                artist={artist}
+                showDistance={distanceSorted}
+                distance={artist.distance ?? artist.distanceKm ?? artist.distance_km}
+              />
             </View>
           ))}
           {/* Centered grid: fillers are not needed with justifyContent: 'center' */}
@@ -338,11 +348,22 @@ const styles = StyleSheet.create({
   container: { paddingBottom: 0, flexGrow: 1 },
   hero: { width: '96%', maxWidth: 1360, minHeight: 470, alignSelf: 'center', marginTop: 16, padding: 34, justifyContent: 'center', overflow: 'hidden', backgroundColor: theme.accentDark },
   compactHero: { minHeight: 370, padding: 24 },
-  heroImage: { borderRadius: 4 },
-  heroShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(32, 22, 18, 0.62)' },
-  eyebrow: { color: '#E4C9A9', fontSize: 11, letterSpacing: 2, fontWeight: '700', marginBottom: 18 },
-  compactEyebrow: { fontSize: 9, letterSpacing: 1.4, marginBottom: 12 },
-  heroTitle: { color: '#F8F3EC', fontFamily: 'Georgia', fontSize: 48, lineHeight: 54, maxWidth: 660 },
+  heroImage: { borderRadius: 4, opacity: 0.55 },
+  heroShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(20, 14, 11, 0.72)',
+  },
+  compactEyebrow: {
+    color: '#F8F3EC',
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: '700',
+    marginBottom: 18,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  heroTitle: { color: '#F8F3EC', fontFamily: SERIF_FONT, fontSize: 48, lineHeight: 54, maxWidth: 660 },
   compactHeroTitle: { fontSize: 36, lineHeight: 41 },
   heroCopy: { color: '#F3E9DF', fontSize: 16, lineHeight: 25, maxWidth: 470, marginTop: 14, marginBottom: 24 },
   compactHeroCopy: { fontSize: 14, lineHeight: 21, marginTop: 10, marginBottom: 18 },
@@ -355,7 +376,7 @@ const styles = StyleSheet.create({
   sectionIntro: { maxWidth: 680, alignSelf: 'center', alignItems: 'center', paddingHorizontal: 24, paddingTop: 62, paddingBottom: 26 },
   compactSectionIntro: { paddingTop: 34, paddingBottom: 18 },
   kicker: { color: theme.muted, fontSize: 10, fontWeight: '700', letterSpacing: 2, marginBottom: 10 },
-  sectionTitle: { color: theme.accent, fontFamily: 'Georgia', fontSize: 34, textAlign: 'center' },
+  sectionTitle: { color: theme.accent, fontFamily: SERIF_FONT, fontSize: 34, textAlign: 'center' },
   sectionCopy: { color: theme.muted, fontSize: 14, lineHeight: 22, textAlign: 'center', maxWidth: 560, marginTop: 10 },
   searchBox: { flexDirection: 'row', alignItems: 'center', maxWidth: 720, width: '90%', alignSelf: 'center', backgroundColor: theme.panelSoft, borderColor: theme.border, borderWidth: 1, borderRadius: 4, paddingHorizontal: 16, marginVertical: 14 },
   searchIcon: { color: theme.accent, fontSize: 26, marginRight: 10 },
@@ -394,7 +415,7 @@ const styles = StyleSheet.create({
   sortChipSelected: { backgroundColor: theme.accent, borderColor: theme.accent },
   sortText: { color: theme.accent, fontSize: 9, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
   resultsHeading: { maxWidth: 1100, width: '90%', alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 22, marginBottom: 20, borderBottomWidth: 1, borderBottomColor: theme.border, paddingBottom: 14 },
-  resultsTitle: { color: theme.accent, fontFamily: 'Georgia', fontSize: 28 },
+  resultsTitle: { color: theme.accent, fontFamily: SERIF_FONT, fontSize: 28 },
   resultCount: { color: theme.muted, fontSize: 10, fontWeight: '700', letterSpacing: 1.3, marginBottom: 3 },
   resultsActions: { alignItems: 'flex-end', gap: 8 },
   viewToggle: { flexDirection: 'row', borderWidth: 1, borderColor: theme.border },
@@ -408,9 +429,9 @@ const styles = StyleSheet.create({
   retryText: { color: theme.accent, fontSize: 9, fontWeight: '700', letterSpacing: 1 },
   textButtonHovered: { opacity: 0.72 },
   loading: { width: '100%', marginBottom: 24 },
-  grid: { maxWidth: 1100, width: '90%', alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
+  grid: { maxWidth: 1100, width: '90%', alignSelf: 'center', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', rowGap: 20 },
   gridItem: { gap: 24 },
-  mapContainer: { maxWidth: 1100, width: '90%', alignSelf: 'center', borderWidth: 1, borderColor: theme.border, backgroundColor: theme.panelSoft, padding: 8 },
+  mapContainer: { maxWidth: 1100, width: '90%', alignSelf: 'center', borderWidth: 1, borderColor: theme.border, backgroundColor: theme.panelSoft, padding: 8, marginBottom: 24 },
   mapLegend: { flexDirection: 'row', gap: 16, paddingHorizontal: 8, paddingVertical: 9 },
   mapLegendText: { color: theme.muted, fontSize: 11 },
   eventLegendDot: { color: '#365B73' },
@@ -418,10 +439,10 @@ const styles = StyleSheet.create({
   mapNote: { color: theme.muted, fontSize: 10, lineHeight: 15, paddingHorizontal: 8, paddingTop: 8, paddingBottom: 4 },
   cardWrap: { minWidth: 0 },
   emptyState: { width: '100%', paddingVertical: 44, alignItems: 'center' },
-  emptyTitle: { color: theme.accent, fontFamily: 'Georgia', fontSize: 24 },
+  emptyTitle: { color: theme.accent, fontFamily: SERIF_FONT, fontSize: 24 },
   callout: { width: '96%', maxWidth: 1360, alignSelf: 'center', backgroundColor: theme.accent, marginTop: 18, paddingVertical: 40, paddingHorizontal: 28, alignItems: 'center', borderRadius: 4 },
   kickerLight: { color: '#E4C9A9', fontSize: 10, fontWeight: '700', letterSpacing: 2 },
-  calloutTitle: { color: '#fff', fontFamily: 'Georgia', fontSize: 32, marginTop: 12 },
+  calloutTitle: { color: '#fff', fontFamily: SERIF_FONT, fontSize: 32, marginTop: 12 },
   calloutCopy: { color: '#F1E8DF', textAlign: 'center', maxWidth: 500, lineHeight: 22, marginTop: 8 },
   calloutButton: { backgroundColor: '#F6F1EA', paddingVertical: 13, paddingHorizontal: 22, borderRadius: 24, marginTop: 22 },
   calloutButtonText: { color: theme.accent, fontSize: 12, fontWeight: '700', letterSpacing: 0.6 },

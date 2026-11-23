@@ -1,13 +1,7 @@
 let API_URL = 'https://gigmatch-orcin.vercel.app/api';
 
-// Use localhost for local development when running via Expo
 if (typeof process !== 'undefined' && process.env && process.env.EXPO_PUBLIC_API_URL) {
   API_URL = process.env.EXPO_PUBLIC_API_URL;
-} else if (typeof window !== 'undefined' && window.location) {
-  const host = window.location.hostname;
-  if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.')) {
-    API_URL = 'http://localhost:5000/api';
-  }
 }
 
 API_URL = String(API_URL || '').trim().replace(/\/+$/, '');
