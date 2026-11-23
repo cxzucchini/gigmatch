@@ -68,23 +68,23 @@ export default function AppHeader({ active }) {
       {user ? (
         // Inside mobileRightActions:
         <TouchableOpacity
-       onPress={() => router.push('/notifications')}
-       style={[styles.bellButton, active === 'Notifications' && styles.bellButtonActive]}
-       accessibilityRole="button"
-       accessibilityLabel={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}
-     >
-       <View style={styles.bellIcon}>
-         <View style={styles.bellTopKnob} />
-         <View style={styles.bellDome} />
-         <View style={styles.bellBase} />
-         <View style={styles.bellClapper} />
-       </View>
-       {Boolean(unreadCount) && (
-         <View style={styles.bellBadge}>
-           <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
-         </View>
-       )}
-     </TouchableOpacity>
+          onPress={() => router.push('/notifications')}
+          style={[styles.bellButton, active === 'Notifications' && styles.bellButtonActive]}
+          accessibilityRole="button"
+          accessibilityLabel={unreadCount ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+        >
+          <View style={styles.bellIcon}>
+            <View style={styles.bellTopKnob} />
+            <View style={styles.bellDome} />
+            <View style={styles.bellBase} />
+            <View style={styles.bellClapper} />
+          </View>
+          {Boolean(unreadCount) && (
+            <View style={styles.bellBadge}>
+              <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : String(unreadCount)}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       ) : null}
       {accountButton}
     </View>
@@ -227,7 +227,8 @@ const styles = StyleSheet.create({
   brandName: { color: theme.accent, fontFamily: SERIF_FONT, fontSize: 24 },
   mobileBrand: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   mobileBrandName: { color: theme.accent, fontFamily: SERIF_FONT, fontSize: 20 },
-  brandTag: { color: theme.muted, fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  brandTag: { color: theme.accentDark || theme.text, fontSize: 10, fontWeight: '700', letterSpacing: 1.5 },
+  link: { color: theme.text, fontSize: 13, fontWeight: '500', letterSpacing: 0.3 },
   links: { alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: '100%', paddingVertical: 6 },
   desktopLinks: { flexDirection: 'row', alignItems: 'center', gap: 24, marginLeft: 'auto', paddingLeft: 24, paddingVertical: 0, minWidth: 0 },
   linkWrap: { minHeight: 36, justifyContent: 'center', alignItems: 'center' },
@@ -308,37 +309,37 @@ const styles = StyleSheet.create({
   drawerGetStartedButton: { alignSelf: 'center', paddingHorizontal: 24, paddingVertical: 10, backgroundColor: theme.accent, borderRadius: 20 },
   drawerGetStartedText: { color: '#fff', fontSize: 14, fontWeight: '700', letterSpacing: 0.5 },
   bellIcon: {
-width: 16,
-height: 17,
-alignItems: 'center',
-justifyContent: 'flex-start',
-},
-bellTopKnob: {
-width: 3,
-height: 2,
-borderRadius: 1,
-backgroundColor: theme.accent,
-},
-bellDome: {
-width: 11,
-height: 10,
-borderTopLeftRadius: 6,
-borderTopRightRadius: 6,
-backgroundColor: theme.accent,
-},
-bellBase: {
-width: 14,
-height: 2,
-borderRadius: 1,
-backgroundColor: theme.accent,
-marginTop: -1,
-},
-bellClapper: {
-width: 4,
-height: 2.5,
-borderBottomLeftRadius: 2,
-borderBottomRightRadius: 2,
-backgroundColor: theme.accent,
-marginTop: 1,
-},
+    width: 16,
+    height: 17,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  bellTopKnob: {
+    width: 3,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: theme.accent,
+  },
+  bellDome: {
+    width: 11,
+    height: 10,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 6,
+    backgroundColor: theme.accent,
+  },
+  bellBase: {
+    width: 14,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: theme.accent,
+    marginTop: -1,
+  },
+  bellClapper: {
+    width: 4,
+    height: 2.5,
+    borderBottomLeftRadius: 2,
+    borderBottomRightRadius: 2,
+    backgroundColor: theme.accent,
+    marginTop: 1,
+  },
 });
