@@ -129,7 +129,15 @@ export default function HomeScreen() {
           style={[styles.hero, compact && styles.compactHero]}
         >
           <View style={styles.heroShade} />
-          <Text style={[styles.eyebrow, compact && styles.compactEyebrow]}>LIVE MUSIC, BEAUTIFULLY MATCHED</Text>
+          <Text
+            style={[
+              styles.eyebrow,
+              compact && styles.compactEyebrow,
+              { color: compact ? '#F8F3EC' : '#E4C9A9' },
+            ]}
+          >
+            LIVE MUSIC, BEAUTIFULLY MATCHED
+          </Text>
           <Text style={[styles.heroTitle, compact && styles.compactHeroTitle]}>Find the perfect{'\n'}artist for your event.</Text>
           <Text style={[styles.heroCopy, compact && styles.compactHeroCopy]}>Discover talented local performers, compare styles and rates, and make your next gathering unforgettable.</Text>
           <HoverPressable
