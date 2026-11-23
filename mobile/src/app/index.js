@@ -353,8 +353,18 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(20, 14, 11, 0.72)',
   },
-  compactEyebrow: {
+  eyebrow: {
     color: '#E4C9A9',
+    fontSize: 11,
+    letterSpacing: 2,
+    fontWeight: '700',
+    marginBottom: 18,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  compactEyebrow: {
+    color: '#F8F3EC',
     fontSize: 11,
     letterSpacing: 2,
     fontWeight: '700',
