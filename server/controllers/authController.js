@@ -4,6 +4,7 @@ const User = require('../models/User');
 const sendEmail = require('../utils/sendEmail');
 
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_OTP_ATTEMPTS = 5;
 
 const generateToken = (id) => {
   if (!process.env.JWT_SECRET) {
@@ -20,6 +21,13 @@ const createOtp = () => {
     hashedCode,
     expiresAt: new Date(Date.now() + OTP_TTL_MS),
   };
+};
+
+const clearOtpState = (user) => {
+  user.otpCode = null;
+  user.otpExpires = null;
+  user.otpPurpose = null;
+  user.otpAttempts = 0;
 };
 
 const sendOtpEmail = async ({ to, name, code, purpose }) => {
@@ -80,6 +88,7 @@ const registerUser = async (req, res) => {
       otpCode: hashedCode,
       otpExpires: expiresAt,
       otpPurpose: 'verify_email',
+      otpAttempts: 0,
     });
 
     try {
@@ -134,7 +143,7 @@ const verifyEmail = async (req, res) => {
       return res.status(503).json({ message: 'Authentication is temporarily unavailable' });
     }
 
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: normalizedEmail }).select('+otpCode');
     if (!user) {
       return res.status(404).json({ message: 'Account not found' });
     }
@@ -151,22 +160,31 @@ const verifyEmail = async (req, res) => {
       });
     }
 
-    const hashedInput = crypto.createHash('sha256').update(cleanCode).digest('hex');
     const isExpired = !user.otpExpires || new Date(user.otpExpires).getTime() < Date.now();
+    if (user.otpPurpose !== 'verify_email' || !user.otpCode || isExpired) {
+      clearOtpState(user);
+      await user.save();
+      return res.status(400).json({ message: 'Invalid or expired verification code' });
+    }
 
-    if (
-      user.otpPurpose !== 'verify_email' ||
-      !user.otpCode ||
-      user.otpCode !== hashedInput ||
-      isExpired
-    ) {
+    if ((user.otpAttempts || 0) >= MAX_OTP_ATTEMPTS) {
+      clearOtpState(user);
+      await user.save();
+      return res.status(429).json({ message: 'Too many failed attempts. Please request a new code.' });
+    }
+
+    const hashedInput = crypto.createHash('sha256').update(cleanCode).digest('hex');
+    if (user.otpCode !== hashedInput) {
+      user.otpAttempts = (user.otpAttempts || 0) + 1;
+      if (user.otpAttempts >= MAX_OTP_ATTEMPTS) {
+        clearOtpState(user);
+      }
+      await user.save();
       return res.status(400).json({ message: 'Invalid or expired verification code' });
     }
 
     user.isEmailVerified = true;
-    user.otpCode = null;
-    user.otpExpires = null;
-    user.otpPurpose = null;
+    clearOtpState(user);
     await user.save();
 
     res.json({
@@ -209,6 +227,7 @@ const resendOtp = async (req, res) => {
     user.otpCode = hashedCode;
     user.otpExpires = expiresAt;
     user.otpPurpose = purpose;
+    user.otpAttempts = 0;
     await user.save();
 
     await sendOtpEmail({
@@ -243,6 +262,7 @@ const forgotPassword = async (req, res) => {
     user.otpCode = hashedCode;
     user.otpExpires = expiresAt;
     user.otpPurpose = 'reset_password';
+    user.otpAttempts = 0;
     await user.save();
 
     await sendOtpEmail({
@@ -272,28 +292,37 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'New password must be between 8 and 72 characters' });
     }
 
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: normalizedEmail }).select('+otpCode');
     if (!user) {
       return res.status(400).json({ message: 'Invalid or expired reset code' });
     }
 
-    const hashedInput = crypto.createHash('sha256').update(cleanCode).digest('hex');
     const isExpired = !user.otpExpires || new Date(user.otpExpires).getTime() < Date.now();
+    if (user.otpPurpose !== 'reset_password' || !user.otpCode || isExpired) {
+      clearOtpState(user);
+      await user.save();
+      return res.status(400).json({ message: 'Invalid or expired reset code' });
+    }
 
-    if (
-      user.otpPurpose !== 'reset_password' ||
-      !user.otpCode ||
-      user.otpCode !== hashedInput ||
-      isExpired
-    ) {
+    if ((user.otpAttempts || 0) >= MAX_OTP_ATTEMPTS) {
+      clearOtpState(user);
+      await user.save();
+      return res.status(429).json({ message: 'Too many failed attempts. Please request a new reset code.' });
+    }
+
+    const hashedInput = crypto.createHash('sha256').update(cleanCode).digest('hex');
+    if (user.otpCode !== hashedInput) {
+      user.otpAttempts = (user.otpAttempts || 0) + 1;
+      if (user.otpAttempts >= MAX_OTP_ATTEMPTS) {
+        clearOtpState(user);
+      }
+      await user.save();
       return res.status(400).json({ message: 'Invalid or expired reset code' });
     }
 
     user.password = newPassword;
     user.isEmailVerified = true;
-    user.otpCode = null;
-    user.otpExpires = null;
-    user.otpPurpose = null;
+    clearOtpState(user);
     await user.save();
 
     res.json({ message: 'Password reset successful. You can now sign in.' });
@@ -315,13 +344,12 @@ const loginUser = async (req, res) => {
       console.error('JWT_SECRET is not configured');
       return res.status(503).json({ message: 'Authentication is temporarily unavailable' });
     }
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: normalizedEmail }).select('+password');
 
     if (!user || !(await user.matchPassword(password))) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    // Legacy accounts created before isEmailVerified existed have undefined; treat explicit false as unverified
     if (user.isEmailVerified === false) {
       return res.status(403).json({
         message: 'Please verify your email address before signing in',
@@ -357,6 +385,15 @@ const getMe = async (req, res) => {
 // Submit ID for verification (required after account creation, for clients and musicians)
 const ID_DOCUMENT_TYPES = ['Passport', "Driver's License", 'National ID (PhilID)', 'UMID', "Voter's ID", 'PRC ID'];
 
+const isSafeHttpsUrl = (value) => {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+};
+
 const submitIdVerification = async (req, res) => {
   const { idDocumentType, idDocumentUrl } = req.body;
 
@@ -364,8 +401,8 @@ const submitIdVerification = async (req, res) => {
     if (!ID_DOCUMENT_TYPES.includes(idDocumentType)) {
       return res.status(400).json({ message: 'Choose a valid ID type' });
     }
-    if (typeof idDocumentUrl !== 'string' || !idDocumentUrl.trim()) {
-      return res.status(400).json({ message: 'Upload a photo of your ID' });
+    if (typeof idDocumentUrl !== 'string' || !isSafeHttpsUrl(idDocumentUrl.trim())) {
+      return res.status(400).json({ message: 'Upload a valid photo of your ID' });
     }
 
     const user = await User.findById(req.user._id);

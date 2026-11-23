@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     minlength: 8,
+    select: false,
   },
   role: {
     type: String,
@@ -35,6 +36,7 @@ const userSchema = new mongoose.Schema({
   otpCode: {
     type: String,
     default: null,
+    select: false,
   },
   otpExpires: {
     type: Date,
@@ -44,6 +46,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     enum: ['verify_email', 'reset_password', null],
     default: null,
+  },
+  otpAttempts: {
+    type: Number,
+    default: 0,
   },
   // ID verification fields for clients
   idVerification: {
