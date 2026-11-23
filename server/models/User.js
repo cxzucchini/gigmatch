@@ -20,45 +20,62 @@ const userSchema = new mongoose.Schema({
     minlength: 8,
   },
   role: {
+    type: String,
+    enum: ['client', 'musician', 'admin'],
+    default: 'client',
+  },
+  isVerified: {
+    type: Boolean,
+    default: false,
+  },
+  isEmailVerified: {
+    type: Boolean,
+    default: false,
+  },
+  otpCode: {
+    type: String,
+    default: null,
+  },
+  otpExpires: {
+    type: Date,
+    default: null,
+  },
+  otpPurpose: {
+    type: String,
+    enum: ['verify_email', 'reset_password', null],
+    default: null,
+  },
+  // ID verification fields for clients
+  idVerification: {
+    status: {
       type: String,
-      enum: ['client', 'musician', 'admin'],
-      default: 'client',
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending',
     },
-    isVerified: {
-      type: Boolean,
-      default: false,
+    idDocumentType: {
+      type: String,
+      default: '',
     },
-    // ID verification fields for clients
-    idVerification: {
-      status: {
-        type: String,
-        enum: ['pending', 'approved', 'rejected'],
-        default: 'pending',
-      },
-      idDocumentType: {
-        type: String,
-        default: '',
-      },
-      idDocumentUrl: {
-        type: String,
-        default: '',
-      },
-      submittedAt: {
-        type: Date,
-        default: null,
-      },
-      reviewedAt: {
-        type: Date,
-        default: null,
-      },
-      reviewedBy: {
-        type: String,
-        default: '',
-      },
+    idDocumentUrl: {
+      type: String,
+      default: '',
     },
-  }, {
-    timestamps: true,
-  });
+    submittedAt: {
+      type: Date,
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
+    reviewedBy: {
+      type: String,
+      default: '',
+    },
+  },
+}, {
+  timestamps: true,
+});
 
 userSchema.pre('save', async function() {
   if (!this.isModified('password')) return;

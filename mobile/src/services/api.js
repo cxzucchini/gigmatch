@@ -34,10 +34,39 @@ export async function apiRequest(path, { token, ...options } = {}) {
   if (!response.ok) {
     const error = new Error(data?.message || 'Request failed ' + response.status);
     error.status = response.status;
+    error.data = data;
     throw error;
   }
   if (!data) {
     throw new Error('The server returned an invalid response');
   }
   return data;
+}
+
+export function verifyEmailOtp({ email, code }) {
+  return apiRequest('/auth/verify-email', {
+    method: 'POST',
+    body: JSON.stringify({ email, code }),
+  });
+}
+
+export function resendAuthOtp({ email, purpose = 'verify_email' }) {
+  return apiRequest('/auth/resend-otp', {
+    method: 'POST',
+    body: JSON.stringify({ email, purpose }),
+  });
+}
+
+export function requestPasswordResetOtp({ email }) {
+  return apiRequest('/auth/forgot-password', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetPasswordWithOtp({ email, code, newPassword }) {
+  return apiRequest('/auth/reset-password', {
+    method: 'POST',
+    body: JSON.stringify({ email, code, newPassword }),
+  });
 }

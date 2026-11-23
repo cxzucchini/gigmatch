@@ -1,13 +1,11 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { apiRequest } from '../services/api';
+import { apiRequest, verifyEmailOtp } from '../services/api';
 
 const TOKEN_KEY = 'gigmatch.auth.token';
 const AuthContext = createContext(null);
 
-// Web: persist in localStorage so the session survives page reloads.
-// Native: SecureStore (encrypted Keychain/Keystore).
 async function getStoredToken() {
   if (Platform.OS !== 'web') return SecureStore.getItemAsync(TOKEN_KEY);
   try {
@@ -18,6 +16,7 @@ async function getStoredToken() {
 }
 
 async function saveToken(token) {
+  if (!token) return;
   if (Platform.OS !== 'web') {
     await SecureStore.setItemAsync(TOKEN_KEY, token);
     return;
@@ -47,6 +46,19 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [sessionError, setSessionError] = useState(null);
 
+  const applyAuthenticatedSession = useCallback(async (result) => {
+    await saveToken(result.token);
+    setToken(result.token);
+    const authenticatedUser = {
+      _id: result._id,
+      name: result.name,
+      email: result.email,
+      role: result.role,
+    };
+    setUser(authenticatedUser);
+    return authenticatedUser;
+  }, []);
+
   useEffect(() => {
     let active = true;
     async function restoreSession() {
@@ -74,22 +86,34 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const authenticate = useCallback(async (endpoint, payload) => {
-    const result = await apiRequest(`/auth/${endpoint}`, {
+  const signIn = useCallback(async (email, password) => {
+    const result = await apiRequest('/auth/login', {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ email, password }),
     });
-    await saveToken(result.token);
-    setToken(result.token);
-    const authenticatedUser = { _id: result._id, name: result.name, email: result.email, role: result.role };
-    setUser(authenticatedUser);
-    return authenticatedUser;
-  }, []);
+    return applyAuthenticatedSession(result);
+  }, [applyAuthenticatedSession]);
 
-  const signIn = useCallback((email, password) => authenticate('login', { email, password }), [authenticate]);
-  const signUp = useCallback((name, email, password, role) => (
-    authenticate('register', { name, email, password, role })
-  ), [authenticate]);
+  const signUp = useCallback(async (name, email, password, role) => {
+    const result = await apiRequest('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ name, email, password, role }),
+    });
+    if (result.token) {
+      const authenticatedUser = await applyAuthenticatedSession(result);
+      return { verified: true, user: authenticatedUser };
+    }
+    return {
+      verified: false,
+      email: result.email || email,
+      message: result.message || 'Verification code sent to your email.',
+    };
+  }, [applyAuthenticatedSession]);
+
+  const completeEmailVerification = useCallback(async (email, code) => {
+    const result = await verifyEmailOtp({ email, code });
+    return applyAuthenticatedSession(result);
+  }, [applyAuthenticatedSession]);
 
   const signOut = useCallback(async () => {
     await removeToken();
@@ -103,9 +127,10 @@ export function AuthProvider({ children }) {
     loading,
     signIn,
     signUp,
+    completeEmailVerification,
     signOut,
     sessionError,
-  }), [user, token, loading, signIn, signUp, signOut, sessionError]);
+  }), [user, token, loading, signIn, signUp, completeEmailVerification, signOut, sessionError]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
