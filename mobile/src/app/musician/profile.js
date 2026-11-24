@@ -3,12 +3,12 @@ import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Image } from 're
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import AppHeader from '../components/AppHeader';
-import AppAlert from '../components/AppAlert';
-import HoverPressable from '../components/HoverPressable';
-import { useAuth } from '../context/AuthContext';
-import { apiRequest } from '../services/api';
-import { theme } from '../styles/theme';
+import AppHeader from '../../components/AppHeader';
+import AppAlert from '../../components/AppAlert';
+import HoverPressable from '../../components/HoverPressable';
+import { useAuth } from '../../context/AuthContext';
+import { apiRequest } from '../../services/api';
+import { theme } from '../../styles/theme';
 
 const ID_TYPES = [
   'Passport',
