@@ -1,5 +1,15 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Image } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  ScrollView,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
+} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -10,146 +20,217 @@ import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../services/api';
 import { theme } from '../../styles/theme';
 
-const ID_TYPES = [
-  'Passport',
-  "Driver's License",
-  'National ID (PhilID)',
-  'UMID',
-  "Voter's ID",
-  'PRC ID',
-];
+const GENRES = ['Jazz', 'Rock', 'RnB', 'Acoustic', 'Pop', 'OPM', 'Reggae', 'Classical'];
+const SOUND_OPTIONS = ['With Sound', 'Artist Only'];
 
-function buildImagePayload(asset) {
+async function compressWebDataUrl(dataUrl, maxWidth = 800, quality = 0.65) {
+  if (Platform.OS !== 'web' || typeof document === 'undefined' || !dataUrl) {
+    return dataUrl;
+  }
+
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+async function buildPhotoPayload(asset) {
   if (!asset) return null;
   if (asset.base64 && typeof asset.base64 === 'string') {
     const rawMime = asset.mimeType || '';
     const mimeType = rawMime.startsWith('image/') ? rawMime : 'image/jpeg';
-    return `data:${mimeType};base64,${asset.base64}`;
+    const rawDataUrl = `data:${mimeType};base64,${asset.base64}`;
+    return compressWebDataUrl(rawDataUrl, 800, 0.65);
   }
   return asset.uri || null;
 }
 
-export default function VerifyIdScreen() {
+export default function MusicianProfileScreen() {
   const router = useRouter();
   const auth = useAuth();
-  const { user, token, loading: authLoading } = auth;
+  const user = auth?.user || null;
+  const token = auth?.token || null;
+  const authLoading = Boolean(auth?.loading);
   const refreshUser = auth?.refreshUser;
 
-  const [checking, setChecking] = useState(true);
-  const [verification, setVerification] = useState(null);
-  const [idType, setIdType] = useState('');
-  const [idImageUri, setIdImageUri] = useState(null);
-  const [idUploadPayload, setIdUploadPayload] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  const userId = user?._id || user?.id || '';
+  const isAdmin = user?.role === 'admin';
+
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [stageName, setStageName] = useState('');
+  const [genre, setGenre] = useState('Acoustic');
+  const [setRate, setSetRate] = useState('');
+  const [soundSetup, setSoundSetup] = useState('With Sound');
+  const [serviceArea, setServiceArea] = useState('');
+  const [bio, setBio] = useState('');
+  const [photoUri, setPhotoUri] = useState(null);
+  const [photoPayload, setPhotoPayload] = useState(null);
+
   const [error, setError] = useState('');
-  const [showSubmitted, setShowSubmitted] = useState(false);
+  const [savedAlertVisible, setSavedAlertVisible] = useState(false);
+  const loadedKeyRef = useRef('');
 
-  const destination = user?.role === 'musician' ? '/musician/profile' : '/';
-
-  const loadStatus = useCallback(async () => {
-    if (!token) {
-      setChecking(false);
+  const loadMusicianProfile = useCallback(async () => {
+    if (!token || !userId || isAdmin) {
+      setLoadingProfile(false);
       return;
     }
+
+    const sessionKey = `${userId}:${token}`;
+    if (loadedKeyRef.current === sessionKey) {
+      setLoadingProfile(false);
+      return;
+    }
+    loadedKeyRef.current = sessionKey;
+
+    setStageName(user?.name || '');
+
     try {
-      const data = await apiRequest('/auth/verify-id', { token });
-      setVerification(data.verification || null);
-      if (
-        data.verification &&
-        data.verification.submittedAt &&
-        data.verification.status !== 'rejected'
-      ) {
-        setIdType(data.verification.idDocumentType || '');
-        setIdImageUri(data.verification.idDocumentUrl || null);
-        setIdUploadPayload(data.verification.idDocumentUrl || null);
+      const data = await apiRequest('/musicians/me', { token });
+      const profile = data?.profile || data?.musician || data || {};
+      if (profile.name || profile.stageName) {
+        setStageName(profile.name || profile.stageName);
+      }
+      if (profile.genre) setGenre(profile.genre);
+      if (profile.price != null || profile.setRate != null) {
+        setSetRate(String(profile.price ?? profile.setRate));
+      }
+      if (profile.soundSetup || profile.equipment) {
+        setSoundSetup(profile.soundSetup || profile.equipment);
+      }
+      if (profile.serviceArea || profile.location || profile.city) {
+        setServiceArea(profile.serviceArea || profile.location || profile.city);
+      }
+      if (profile.bio) setBio(profile.bio);
+      const savedPhoto = profile.photoUrl || profile.avatarUrl || profile.image || null;
+      if (savedPhoto) {
+        setPhotoUri(savedPhoto);
+        setPhotoPayload(savedPhoto);
       }
     } catch {
-      // New accounts have no submission yet; show the form.
+      // Keep initial defaults if no saved musician profile exists yet.
     } finally {
-      setChecking(false);
+      setLoadingProfile(false);
     }
-  }, [token]);
+  }, [token, userId, isAdmin, user]);
 
   useEffect(() => {
-    Promise.resolve().then(loadStatus);
-  }, [loadStatus]);
+    if (authLoading) return;
+    if (isAdmin) {
+      router.replace('/admin');
+      return;
+    }
+    loadMusicianProfile();
+  }, [authLoading, isAdmin, loadMusicianProfile, router]);
 
-  // A real submission always has submittedAt; schema defaults alone produce a
-  // status-less 'pending' subdocument for accounts that never uploaded anything.
-  const alreadySubmitted = Boolean(verification && verification.submittedAt);
-
-  const pickIdImage = async () => {
+  const pickPhoto = async () => {
     setError('');
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.7,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.5,
         base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         const previewUri = asset.uri || null;
-        const payloadUri = buildImagePayload(asset);
+        const payload = await buildPhotoPayload(asset);
 
-        if (!previewUri && !payloadUri) {
-          setError('Upload a valid photo of your ID');
+        if (!previewUri && !payload) {
+          setError('Please choose a valid photo.');
           return;
         }
 
-        setIdImageUri(previewUri || payloadUri);
-        setIdUploadPayload(payloadUri || previewUri);
+        if (typeof payload === 'string' && payload.length > 3_200_000) {
+          setError('Photo is too large. Please choose a smaller image.');
+          return;
+        }
+
+        setPhotoUri(previewUri || payload);
+        setPhotoPayload(payload || previewUri);
       }
     } catch {
       setError('Could not open your photo library. Please try again.');
     }
   };
 
-  const removeIdImage = () => {
-    setIdImageUri(null);
-    setIdUploadPayload(null);
+  const removePhoto = () => {
+    setPhotoUri(null);
+    setPhotoPayload('');
   };
 
-  const submitVerification = async () => {
+  const handleSaveProfile = async () => {
     setError('');
-    if (!idType) {
-      setError('Choose the type of ID you are uploading.');
+
+    if (stageName.trim().length < 2) {
+      setError('Please enter your artist or band name.');
       return;
     }
 
-    const documentToSend = idUploadPayload || idImageUri;
-    if (!documentToSend) {
-      setError('Upload a valid photo of your ID');
+    const numericRate = Number(String(setRate).replace(/[^0-9.]/g, ''));
+    if (!numericRate || numericRate <= 0) {
+      setError('Please enter a valid set rate.');
       return;
     }
 
-    setSubmitting(true);
+    setSaving(true);
     try {
-      const data = await apiRequest('/auth/verify-id', {
-        method: 'POST',
+      const photoToSave = photoPayload !== null ? photoPayload : photoUri || '';
+
+      await apiRequest('/musicians/me', {
+        method: 'PUT',
         token,
         body: JSON.stringify({
-          idDocumentType: idType,
-          idDocumentUrl: documentToSend,
+          name: stageName.trim(),
+          genre,
+          price: numericRate,
+          soundSetup,
+          serviceArea: serviceArea.trim(),
+          bio: bio.trim(),
+          photoUrl: photoToSave,
+          avatarUrl: photoToSave,
         }),
       });
-      setVerification(data.verification);
+
+      loadedKeyRef.current = '';
       if (typeof refreshUser === 'function') {
         await refreshUser();
       }
-      setShowSubmitted(true);
+      setSavedAlertVisible(true);
     } catch (requestError) {
-      setError(requestError.message || 'Unable to submit your ID right now.');
+      setError(requestError.message || 'Unable to save your artist profile right now.');
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
-  if (authLoading || checking) {
+  if (authLoading || loadingProfile || isAdmin) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <AppHeader active="Account" />
+        <AppHeader active="My profile" />
         <View style={styles.center}>
           <ActivityIndicator color={theme.accent} />
         </View>
@@ -160,13 +241,18 @@ export default function VerifyIdScreen() {
   if (!user) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <AppHeader active="Account" />
+        <AppHeader active="My profile" />
         <View style={styles.centerContent}>
-          <Text style={styles.title}>Verify your identity.</Text>
+          <Text style={styles.kicker}>ARTIST PROFILE</Text>
+          <Text style={styles.title}>Set up your artist profile.</Text>
           <Text style={styles.subtitle}>
-            Sign in to complete the required ID verification for your account.
+            Sign in to manage your performance details, rates, and availability.
           </Text>
-          <HoverPressable onPress={() => router.push('/auth')} style={styles.primaryButton}>
+          <HoverPressable
+            onPress={() => router.push('/auth')}
+            style={styles.primaryButton}
+            hoverStyle={styles.primaryButtonHovered}
+          >
             <Text style={styles.primaryButtonText}>Sign in</Text>
           </HoverPressable>
         </View>
@@ -176,111 +262,154 @@ export default function VerifyIdScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <AppHeader active="Account" />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.kicker}>ACCOUNT SECURITY</Text>
-        <Text style={styles.title}>Verify your identity.</Text>
-        <Text style={styles.subtitle}>
-          To keep Gigmatch safe for everyone, every new account must upload one valid government-issued ID.
-          Your ID is reviewed only by the Gigmatch trust &amp; safety team and is never shown to other users.
-        </Text>
+      <AppHeader active="My profile" />
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoiding}
+        behavior={Platform.select({ ios: 'padding', android: 'height' })}
+      >
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <Text style={styles.kicker}>ARTIST PROFILE</Text>
+          <Text style={styles.title}>Your artist profile.</Text>
+          <Text style={styles.subtitle}>
+            Configure how event hosts discover your sound, set rates, and equipment setup.
+          </Text>
 
-        {alreadySubmitted ? (
-          <View style={styles.submittedCard}>
-            <Text style={styles.submittedTitle}>
-              {verification.status === 'approved' ? 'Your ID is verified.' : 'Your ID is under review.'}
-            </Text>
-            <Text style={styles.submittedText}>
-              {verification.status === 'approved'
-                ? 'Thank you — your account is fully verified and you have full access to Gigmatch.'
-                : `We received your ${verification.idDocumentType || 'ID'}. Verification usually takes 1–2 days, but you can start using Gigmatch now.`}
-            </Text>
-            {idImageUri ? (
-              <Image
-                source={{ uri: idImageUri }}
-                style={styles.idPreview}
-                accessibilityLabel="Uploaded ID photo"
-              />
-            ) : null}
-            <HoverPressable onPress={() => router.replace(destination)} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Continue to Gigmatch</Text>
-            </HoverPressable>
-          </View>
-        ) : (
-          <>
-            <Text style={styles.label}>Choose your ID type</Text>
-            <View style={styles.typeGrid}>
-              {ID_TYPES.map((option) => (
-                <HoverPressable
-                  key={option}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Select ${option}`}
-                  accessibilityState={{ selected: idType === option }}
-                  onPress={() => setIdType(option)}
-                  style={[styles.typeOption, idType === option && styles.typeOptionSelected]}
-                >
-                  <Text style={[styles.typeText, idType === option && styles.typeTextSelected]}>
-                    {option}
-                  </Text>
-                </HoverPressable>
-              ))}
-            </View>
-
-            <Text style={styles.label}>Upload a photo of your ID</Text>
-            {idImageUri ? (
-              <View style={styles.previewContainer}>
+          <View style={styles.card}>
+            <Text style={styles.label}>Artist or band photo</Text>
+            {photoUri ? (
+              <View style={styles.previewWrap}>
                 <Image
-                  source={{ uri: idImageUri }}
-                  style={styles.idPreview}
-                  accessibilityLabel="Selected ID photo"
+                  source={{ uri: photoUri }}
+                  style={styles.coverImage}
+                  accessibilityLabel="Artist profile photo"
                 />
-                <HoverPressable onPress={removeIdImage} style={styles.removeImageButton}>
-                  <Text style={styles.removeImageText}>Remove photo</Text>
-                </HoverPressable>
+                <View style={styles.photoActions}>
+                  <HoverPressable onPress={pickPhoto} style={styles.secondaryButton}>
+                    <Text style={styles.secondaryButtonText}>Change photo</Text>
+                  </HoverPressable>
+                  <HoverPressable onPress={removePhoto} style={styles.removeButton}>
+                    <Text style={styles.removeButtonText}>Remove</Text>
+                  </HoverPressable>
+                </View>
               </View>
             ) : (
-              <HoverPressable onPress={pickIdImage} style={styles.uploadButton}>
-                <Text style={styles.uploadButtonText}>Choose ID photo</Text>
+              <HoverPressable onPress={pickPhoto} style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>Upload photo</Text>
               </HoverPressable>
             )}
-            <Text style={styles.note}>
-              Make sure the whole ID is visible, in focus, with no glare. Accepted: Passport, Driver&apos;s License,
-              National ID (PhilID), UMID, Voter&apos;s ID, or PRC ID.
-            </Text>
 
-            <HoverPressable
-              onPress={submitVerification}
-              disabled={submitting || !idType || !idImageUri}
-              style={[
-                styles.primaryButton,
-                (!idType || !idImageUri || submitting) && styles.buttonDisabled,
-              ]}
-            >
-              {submitting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Submit for verification</Text>
-              )}
-            </HoverPressable>
-            <Text style={styles.requiredNote}>
-              ID verification is required to finish creating your account.
-            </Text>
-          </>
-        )}
-      </ScrollView>
+            <Text style={styles.label}>Artist or band name</Text>
+            <TextInput
+              value={stageName}
+              onChangeText={setStageName}
+              placeholder="e.g. The Acoustic Collective"
+              placeholderTextColor={theme.muted}
+              style={styles.input}
+              accessibilityLabel="Artist or band name"
+            />
+
+            <Text style={styles.label}>Primary genre</Text>
+            <View style={styles.chipWrap}>
+              {GENRES.map((item) => {
+                const active = genre === item;
+                return (
+                  <HoverPressable
+                    key={item}
+                    onPress={() => setGenre(item)}
+                    style={[styles.chip, active && styles.chipSelected]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextSelected]}>{item}</Text>
+                  </HoverPressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.label}>Set rate (per 45-min set)</Text>
+            <TextInput
+              value={setRate}
+              onChangeText={setSetRate}
+              placeholder="e.g. 5000"
+              placeholderTextColor={theme.muted}
+              keyboardType="numeric"
+              style={styles.input}
+              accessibilityLabel="Set rate"
+            />
+
+            <Text style={styles.label}>Sound setup</Text>
+            <View style={styles.chipWrap}>
+              {SOUND_OPTIONS.map((option) => {
+                const active = soundSetup === option;
+                return (
+                  <HoverPressable
+                    key={option}
+                    onPress={() => setSoundSetup(option)}
+                    style={[styles.chip, active && styles.chipSelected]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextSelected]}>{option}</Text>
+                  </HoverPressable>
+                );
+              })}
+            </View>
+
+            <Text style={styles.label}>Service area / city</Text>
+            <TextInput
+              value={serviceArea}
+              onChangeText={setServiceArea}
+              placeholder="e.g. Iloilo City"
+              placeholderTextColor={theme.muted}
+              style={styles.input}
+              accessibilityLabel="Service area or city"
+            />
+
+            <Text style={styles.label}>Bio &amp; performance notes</Text>
+            <TextInput
+              value={bio}
+              onChangeText={setBio}
+              placeholder="Describe your setlist, live experience, and gear..."
+              placeholderTextColor={theme.muted}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+              style={[styles.input, styles.textArea]}
+              accessibilityLabel="Bio and performance notes"
+            />
+          </View>
+
+          <HoverPressable
+            onPress={handleSaveProfile}
+            disabled={saving}
+            style={[styles.primaryButton, saving && styles.buttonDisabled]}
+            hoverStyle={styles.primaryButtonHovered}
+          >
+            {saving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>Save artist profile</Text>
+            )}
+          </HoverPressable>
+
+          <HoverPressable onPress={() => router.push('/verify-id')} style={styles.secondaryLink}>
+            <Text style={styles.secondaryLinkText}>ID verification status</Text>
+          </HoverPressable>
+
+          <HoverPressable onPress={() => router.push('/')} style={styles.secondaryLink}>
+            <Text style={styles.secondaryLinkText}>Back to discover</Text>
+          </HoverPressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <AppAlert
-        visible={showSubmitted}
-        title="Verification submitted"
-        message="Thank you! Your ID has been submitted for review. You can start using Gigmatch while we verify it."
+        visible={savedAlertVisible}
+        title="Profile saved"
+        message="Your artist profile has been updated."
         onDismiss={() => {
-          setShowSubmitted(false);
-          router.replace(destination);
+          setSavedAlertVisible(false);
+          router.replace('/');
         }}
       />
       <AppAlert
         visible={Boolean(error)}
-        title="Verification problem"
+        title="Could not save profile"
         message={error}
         onDismiss={() => setError('')}
       />
@@ -290,68 +419,139 @@ export default function VerifyIdScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: theme.background },
+  keyboardAvoiding: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   content: {
-    width: '90%',
-    maxWidth: 560,
+    width: '92%',
+    maxWidth: 640,
     alignSelf: 'center',
-    paddingTop: 36,
-    paddingBottom: 40,
+    paddingTop: 28,
+    paddingBottom: 48,
     flexGrow: 1,
   },
   kicker: { color: theme.muted, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
-  title: { color: theme.accent, fontFamily: 'Georgia', fontSize: 36, marginTop: 10 },
-  subtitle: { color: theme.muted, fontSize: 13, lineHeight: 21, marginTop: 9, marginBottom: 20 },
-  label: { color: theme.accent, fontSize: 12, fontWeight: '600', marginBottom: 8, marginTop: 14 },
-  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeOption: {
-    flexGrow: 1,
-    flexBasis: 150,
-    minHeight: 46,
-    justifyContent: 'center',
-    alignItems: 'center',
+  title: { color: theme.accent, fontFamily: 'Georgia', fontSize: 34, lineHeight: 40, marginTop: 10 },
+  subtitle: { color: theme.muted, fontSize: 13, lineHeight: 21, marginTop: 8, marginBottom: 22 },
+  card: {
+    backgroundColor: '#F6F1EA',
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: 20,
+    marginBottom: 16,
+  },
+  label: {
+    color: theme.accent,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 14,
+    marginBottom: 7,
+  },
+  input: {
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: '#FBF9F6',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    color: theme.text,
+    fontSize: 13,
+    minHeight: 46,
   },
-  typeOptionSelected: { backgroundColor: theme.accent, borderColor: theme.accent },
-  typeText: { color: theme.accent, fontSize: 12, fontWeight: '600', textAlign: 'center' },
-  typeTextSelected: { color: '#fff' },
-  uploadButton: {
+  textArea: {
+    minHeight: 96,
+    paddingTop: 12,
+  },
+  previewWrap: {
+    gap: 10,
+  },
+  coverImage: {
+    width: '100%',
+    height: 190,
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: '#EAE1D7',
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  secondaryButton: {
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: theme.accent,
-    paddingVertical: 11,
-    paddingHorizontal: 18,
+    backgroundColor: '#FBF9F6',
+    paddingVertical: 9,
+    paddingHorizontal: 14,
   },
-  uploadButtonText: { color: theme.accent, fontSize: 13, fontWeight: '700' },
-  previewContainer: { alignItems: 'flex-start', marginBottom: 4 },
-  idPreview: { width: 240, height: 150, borderWidth: 1, borderColor: theme.border, marginBottom: 8 },
-  removeImageButton: {
+  secondaryButtonText: {
+    color: theme.accent,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  removeButton: {
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: '#FBF9F6',
-    paddingVertical: 6,
+    paddingVertical: 9,
     paddingHorizontal: 12,
+  },
+  removeButtonText: {
+    color: theme.muted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  chipWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: '#FBF9F6',
+    paddingVertical: 8,
+    paddingHorizontal: 13,
     borderRadius: 20,
   },
-  removeImageText: { color: theme.text, fontSize: 11, fontWeight: '600' },
-  note: { color: theme.muted, fontSize: 11, lineHeight: 18, marginTop: 12, marginBottom: 6 },
+  chipSelected: {
+    backgroundColor: theme.accent,
+    borderColor: theme.accent,
+  },
+  chipText: {
+    color: theme.accent,
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  chipTextSelected: {
+    color: '#fff',
+  },
   primaryButton: {
     backgroundColor: theme.accentDark,
     minHeight: 48,
-    paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 18,
+    paddingHorizontal: 20,
+    marginTop: 6,
   },
-  primaryButtonText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.6 },
-  buttonDisabled: { opacity: 0.6 },
-  requiredNote: { color: theme.muted, fontSize: 10, lineHeight: 16, marginTop: 10, textAlign: 'center' },
-  submittedCard: { borderWidth: 1, borderColor: '#C4D1BD', backgroundColor: '#E8EFE4', padding: 18 },
-  submittedTitle: { color: '#36543B', fontSize: 16, fontWeight: '700', marginBottom: 6 },
-  submittedText: { color: '#36543B', fontSize: 12, lineHeight: 19, marginBottom: 10 },
+  primaryButtonHovered: {
+    opacity: 0.92,
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
+  },
+  secondaryLink: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  secondaryLinkText: {
+    color: theme.accent,
+    fontSize: 12,
+    fontWeight: '700',
+  },
 });
