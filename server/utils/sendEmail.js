@@ -1,32 +1,25 @@
-const sendEmail = async ({ to, subject, text, html }) => {
-  const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM || 'GigMatch <onboarding@resend.dev>';
+const nodemailer = require('nodemailer');
 
-  if (!apiKey) {
-    throw new Error('RESEND_API_KEY is not configured');
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+});
+
+async function sendEmail({ to, subject, html, text }) {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    throw new Error('GMAIL_USER and GMAIL_APP_PASSWORD must be configured.');
   }
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from,
-      to: Array.isArray(to) ? to : [to],
-      subject,
-      text,
-      html,
-    }),
+  return transporter.sendMail({
+    from: `"GigMatch" <${process.env.GMAIL_USER}>`,
+    to,
+    subject,
+    text,
+    html,
   });
-
-  if (!response.ok) {
-    const errBody = await response.text();
-    throw new Error(`Email send failed (${response.status}): ${errBody}`);
-  }
-
-  return await response.json();
-};
+}
 
 module.exports = sendEmail;
