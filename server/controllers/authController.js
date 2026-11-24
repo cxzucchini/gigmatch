@@ -358,12 +358,17 @@ const loginUser = async (req, res) => {
       });
     }
 
+    const verificationStatus = user.idVerification?.submittedAt
+      ? user.idVerification.status || 'pending'
+      : 'unverified';
+
     res.json({
       _id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
       isEmailVerified: user.isEmailVerified !== false,
+      verificationStatus,
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -373,21 +378,46 @@ const loginUser = async (req, res) => {
 };
 
 const getMe = async (req, res) => {
+  const verificationStatus = req.user.idVerification?.submittedAt
+    ? req.user.idVerification.status || 'pending'
+    : 'unverified';
+
   res.json({
     _id: req.user._id,
     name: req.user.name,
     email: req.user.email,
     role: req.user.role,
     isEmailVerified: req.user.isEmailVerified !== false,
+    verificationStatus,
   });
 };
 
 // Submit ID for verification (required after account creation, for clients and musicians)
-const ID_DOCUMENT_TYPES = ['Passport', "Driver's License", 'National ID (PhilID)', 'UMID', "Voter's ID", 'PRC ID'];
+const ID_DOCUMENT_TYPES = [
+  'Passport',
+  "Driver's License",
+  'National ID (PhilID)',
+  'UMID',
+  "Voter's ID",
+  'PRC ID',
+];
 
-const isSafeHttpsUrl = (value) => {
+const MAX_ID_DATA_URI_LENGTH = 4_200_000;
+
+const isValidIdDocument = (value) => {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+
+  const dataUriMatch = trimmed.match(
+    /^data:image\/(jpeg|jpg|png|webp);base64,([A-Za-z0-9+/=]+)$/i
+  );
+  if (dataUriMatch) {
+    return trimmed.length <= MAX_ID_DATA_URI_LENGTH;
+  }
+
   try {
-    const parsed = new URL(value);
+    const parsed = new URL(trimmed);
     return parsed.protocol === 'https:';
   } catch {
     return false;
@@ -401,7 +431,7 @@ const submitIdVerification = async (req, res) => {
     if (!ID_DOCUMENT_TYPES.includes(idDocumentType)) {
       return res.status(400).json({ message: 'Choose a valid ID type' });
     }
-    if (typeof idDocumentUrl !== 'string' || !isSafeHttpsUrl(idDocumentUrl.trim())) {
+    if (!isValidIdDocument(idDocumentUrl)) {
       return res.status(400).json({ message: 'Upload a valid photo of your ID' });
     }
 
