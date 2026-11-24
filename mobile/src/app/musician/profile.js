@@ -1,15 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  ScrollView,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Image,
-} from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Image } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -20,191 +10,143 @@ import { useAuth } from '../../context/AuthContext';
 import { apiRequest } from '../../services/api';
 import { theme } from '../../styles/theme';
 
-async function compressWebDataUrl(dataUrl, maxWidth = 800, quality = 0.65) {
-  if (Platform.OS !== 'web' || typeof document === 'undefined' || !dataUrl) {
-    return dataUrl;
-  }
+const ID_TYPES = [
+  'Passport',
+  "Driver's License",
+  'National ID (PhilID)',
+  'UMID',
+  "Voter's ID",
+  'PRC ID',
+];
 
-  return new Promise((resolve) => {
-    const img = new window.Image();
-    img.onload = () => {
-      let { width, height } = img;
-      if (width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        resolve(dataUrl);
-        return;
-      }
-      ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => resolve(dataUrl);
-    img.src = dataUrl;
-  });
-}
-
-async function buildAvatarPayload(asset) {
+function buildImagePayload(asset) {
   if (!asset) return null;
   if (asset.base64 && typeof asset.base64 === 'string') {
     const rawMime = asset.mimeType || '';
     const mimeType = rawMime.startsWith('image/') ? rawMime : 'image/jpeg';
-    const rawDataUrl = `data:${mimeType};base64,${asset.base64}`;
-    return compressWebDataUrl(rawDataUrl, 800, 0.65);
+    return `data:${mimeType};base64,${asset.base64}`;
   }
   return asset.uri || null;
 }
 
-export default function ClientProfileScreen() {
+export default function VerifyIdScreen() {
   const router = useRouter();
   const auth = useAuth();
   const { user, token, loading: authLoading } = auth;
   const refreshUser = auth?.refreshUser;
 
-  const isAdmin = user?.role === 'admin';
-
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const [fullName, setFullName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [city, setCity] = useState('');
-  const [bio, setBio] = useState('');
-  const [avatarUri, setAvatarUri] = useState(null);
-  const [avatarPayload, setAvatarPayload] = useState(null);
-
+  const [checking, setChecking] = useState(true);
+  const [verification, setVerification] = useState(null);
+  const [idType, setIdType] = useState('');
+  const [idImageUri, setIdImageUri] = useState(null);
+  const [idUploadPayload, setIdUploadPayload] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [savedAlertVisible, setSavedAlertVisible] = useState(false);
+  const [showSubmitted, setShowSubmitted] = useState(false);
 
-  const loadClientProfile = useCallback(async () => {
-    if (!token || !user || isAdmin) {
-      setLoadingProfile(false);
+  const destination = user?.role === 'musician' ? '/musician/profile' : '/';
+
+  const loadStatus = useCallback(async () => {
+    if (!token) {
+      setChecking(false);
       return;
     }
-
-    setFullName(user.name || '');
-    const initialAvatar = user.avatarUrl || user.profilePicture || user.avatar || null;
-    if (initialAvatar) {
-      setAvatarUri(initialAvatar);
-      setAvatarPayload(initialAvatar);
-    }
-
     try {
-      const data = await apiRequest('/users/me/profile', { token });
-      const profile = data?.profile || data || {};
-      if (profile.name) setFullName(profile.name);
-      if (profile.phone) setPhone(profile.phone);
-      if (profile.city || profile.location) setCity(profile.city || profile.location);
-      if (profile.bio || profile.notes) setBio(profile.bio || profile.notes);
-      const savedAvatar =
-        profile.avatarUrl || profile.profilePicture || profile.avatar || null;
-      if (savedAvatar) {
-        setAvatarUri(savedAvatar);
-        setAvatarPayload(savedAvatar);
+      const data = await apiRequest('/auth/verify-id', { token });
+      setVerification(data.verification || null);
+      if (
+        data.verification &&
+        data.verification.submittedAt &&
+        data.verification.status !== 'rejected'
+      ) {
+        setIdType(data.verification.idDocumentType || '');
+        setIdImageUri(data.verification.idDocumentUrl || null);
+        setIdUploadPayload(data.verification.idDocumentUrl || null);
       }
     } catch {
-      // Keep defaults from auth user if no saved profile exists yet.
+      // New accounts have no submission yet; show the form.
     } finally {
-      setLoadingProfile(false);
+      setChecking(false);
     }
-  }, [token, user, isAdmin]);
+  }, [token]);
 
   useEffect(() => {
-    loadClientProfile();
-  }, [loadClientProfile]);
+    Promise.resolve().then(loadStatus);
+  }, [loadStatus]);
 
-  useEffect(() => {
-    if (!authLoading && isAdmin) {
-      router.replace('/admin');
-    }
-  }, [authLoading, isAdmin, router]);
+  // A real submission always has submittedAt; schema defaults alone produce a
+  // status-less 'pending' subdocument for accounts that never uploaded anything.
+  const alreadySubmitted = Boolean(verification && verification.submittedAt);
 
-  const pickAvatarImage = async () => {
+  const pickIdImage = async () => {
     setError('');
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.5,
+        allowsEditing: false,
+        quality: 0.7,
         base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         const previewUri = asset.uri || null;
-        const payload = await buildAvatarPayload(asset);
+        const payloadUri = buildImagePayload(asset);
 
-        if (!previewUri && !payload) {
-          setError('Please choose a valid profile photo.');
+        if (!previewUri && !payloadUri) {
+          setError('Upload a valid photo of your ID');
           return;
         }
 
-        if (typeof payload === 'string' && payload.length > 3_200_000) {
-          setError('Profile photo is too large. Please choose a smaller image.');
-          return;
-        }
-
-        setAvatarUri(previewUri || payload);
-        setAvatarPayload(payload || previewUri);
+        setIdImageUri(previewUri || payloadUri);
+        setIdUploadPayload(payloadUri || previewUri);
       }
     } catch {
       setError('Could not open your photo library. Please try again.');
     }
   };
 
-  const removeAvatarImage = () => {
-    setAvatarUri(null);
-    setAvatarPayload('');
+  const removeIdImage = () => {
+    setIdImageUri(null);
+    setIdUploadPayload(null);
   };
 
-  const handleSaveProfile = async () => {
+  const submitVerification = async () => {
     setError('');
-
-    if (fullName.trim().length < 2) {
-      setError('Please enter your name (at least 2 characters).');
+    if (!idType) {
+      setError('Choose the type of ID you are uploading.');
       return;
     }
 
-    if (phone.trim() && !/^[0-9+\-\s()]{7,20}$/.test(phone.trim())) {
-      setError('Please enter a valid contact number.');
+    const documentToSend = idUploadPayload || idImageUri;
+    if (!documentToSend) {
+      setError('Upload a valid photo of your ID');
       return;
     }
 
-    setSaving(true);
+    setSubmitting(true);
     try {
-      const photoToSave = avatarPayload !== null ? avatarPayload : avatarUri || '';
-
-      await apiRequest('/users/me/profile', {
-        method: 'PUT',
+      const data = await apiRequest('/auth/verify-id', {
+        method: 'POST',
         token,
         body: JSON.stringify({
-          name: fullName.trim(),
-          phone: phone.trim(),
-          city: city.trim(),
-          bio: bio.trim(),
-          avatarUrl: photoToSave,
-          profilePicture: photoToSave,
+          idDocumentType: idType,
+          idDocumentUrl: documentToSend,
         }),
       });
-
+      setVerification(data.verification);
       if (typeof refreshUser === 'function') {
         await refreshUser();
       }
-      setSavedAlertVisible(true);
+      setShowSubmitted(true);
     } catch (requestError) {
-      setError(requestError.message || 'Unable to save your profile right now.');
+      setError(requestError.message || 'Unable to submit your ID right now.');
     } finally {
-      setSaving(false);
+      setSubmitting(false);
     }
   };
 
-  if (authLoading || loadingProfile || isAdmin) {
+  if (authLoading || checking) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <AppHeader active="Account" />
@@ -220,16 +162,11 @@ export default function ClientProfileScreen() {
       <SafeAreaView style={styles.safeArea}>
         <AppHeader active="Account" />
         <View style={styles.centerContent}>
-          <Text style={styles.kicker}>CLIENT PROFILE</Text>
-          <Text style={styles.title}>Set up your profile.</Text>
+          <Text style={styles.title}>Verify your identity.</Text>
           <Text style={styles.subtitle}>
-            Sign in to view and update your account profile.
+            Sign in to complete the required ID verification for your account.
           </Text>
-          <HoverPressable
-            onPress={() => router.push('/auth')}
-            style={styles.primaryButton}
-            hoverStyle={styles.primaryButtonHovered}
-          >
+          <HoverPressable onPress={() => router.push('/auth')} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Sign in</Text>
           </HoverPressable>
         </View>
@@ -237,149 +174,113 @@ export default function ClientProfileScreen() {
     );
   }
 
-  const initials = (fullName || user.email || 'U')
-    .trim()
-    .charAt(0)
-    .toUpperCase();
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <AppHeader active="Account" />
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoiding}
-        behavior={Platform.select({ ios: 'padding', android: 'height' })}
-      >
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <Text style={styles.kicker}>CLIENT PROFILE</Text>
-          <Text style={styles.title}>Your profile.</Text>
-          <Text style={styles.subtitle}>
-            Manage your profile photo and basic account details.
-          </Text>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Text style={styles.kicker}>ACCOUNT SECURITY</Text>
+        <Text style={styles.title}>Verify your identity.</Text>
+        <Text style={styles.subtitle}>
+          To keep Gigmatch safe for everyone, every new account must upload one valid government-issued ID.
+          Your ID is reviewed only by the Gigmatch trust &amp; safety team and is never shown to other users.
+        </Text>
 
-          <View style={styles.card}>
-            <Text style={styles.label}>Profile picture</Text>
-            <View style={styles.avatarRow}>
-              {avatarUri ? (
-                <Image
-                  source={{ uri: avatarUri }}
-                  style={styles.avatarImage}
-                  accessibilityLabel="Client profile picture"
-                />
-              ) : (
-                <View style={styles.avatarPlaceholder}>
-                  <Text style={styles.avatarInitials}>{initials}</Text>
-                </View>
-              )}
-
-              <View style={styles.avatarActions}>
+        {alreadySubmitted ? (
+          <View style={styles.submittedCard}>
+            <Text style={styles.submittedTitle}>
+              {verification.status === 'approved' ? 'Your ID is verified.' : 'Your ID is under review.'}
+            </Text>
+            <Text style={styles.submittedText}>
+              {verification.status === 'approved'
+                ? 'Thank you — your account is fully verified and you have full access to Gigmatch.'
+                : `We received your ${verification.idDocumentType || 'ID'}. Verification usually takes 1–2 days, but you can start using Gigmatch now.`}
+            </Text>
+            {idImageUri ? (
+              <Image
+                source={{ uri: idImageUri }}
+                style={styles.idPreview}
+                accessibilityLabel="Uploaded ID photo"
+              />
+            ) : null}
+            <HoverPressable onPress={() => router.replace(destination)} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>Continue to Gigmatch</Text>
+            </HoverPressable>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.label}>Choose your ID type</Text>
+            <View style={styles.typeGrid}>
+              {ID_TYPES.map((option) => (
                 <HoverPressable
-                  onPress={pickAvatarImage}
-                  style={styles.secondaryButton}
-                  hoverStyle={styles.secondaryButtonHovered}
+                  key={option}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select ${option}`}
+                  accessibilityState={{ selected: idType === option }}
+                  onPress={() => setIdType(option)}
+                  style={[styles.typeOption, idType === option && styles.typeOptionSelected]}
                 >
-                  <Text style={styles.secondaryButtonText}>
-                    {avatarUri ? 'Change photo' : 'Upload photo'}
+                  <Text style={[styles.typeText, idType === option && styles.typeTextSelected]}>
+                    {option}
                   </Text>
                 </HoverPressable>
-
-                {avatarUri ? (
-                  <HoverPressable
-                    onPress={removeAvatarImage}
-                    style={styles.removePhotoButton}
-                  >
-                    <Text style={styles.removePhotoText}>Remove</Text>
-                  </HoverPressable>
-                ) : null}
-              </View>
+              ))}
             </View>
 
-            <Text style={styles.label}>Full name</Text>
-            <TextInput
-              value={fullName}
-              onChangeText={setFullName}
-              placeholder="Your full name"
-              placeholderTextColor={theme.muted}
-              style={styles.input}
-              accessibilityLabel="Full name"
-            />
-
-            <Text style={styles.label}>Email address</Text>
-            <TextInput
-              value={user.email || ''}
-              editable={false}
-              style={[styles.input, styles.inputReadonly]}
-              accessibilityLabel="Email address"
-            />
-
-            <Text style={styles.label}>Phone number</Text>
-            <TextInput
-              value={phone}
-              onChangeText={setPhone}
-              placeholder="e.g. 09XX XXX XXXX"
-              placeholderTextColor={theme.muted}
-              keyboardType="phone-pad"
-              style={styles.input}
-              accessibilityLabel="Phone number"
-            />
-
-            <Text style={styles.label}>City</Text>
-            <TextInput
-              value={city}
-              onChangeText={setCity}
-              placeholder="e.g. Iloilo City"
-              placeholderTextColor={theme.muted}
-              style={styles.input}
-              accessibilityLabel="City"
-            />
-
-            <Text style={styles.label}>Bio</Text>
-            <TextInput
-              value={bio}
-              onChangeText={setBio}
-              placeholder="A short note about you..."
-              placeholderTextColor={theme.muted}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-              style={[styles.input, styles.textArea]}
-              accessibilityLabel="Bio"
-            />
-          </View>
-
-          <HoverPressable
-            onPress={handleSaveProfile}
-            disabled={saving}
-            style={[styles.primaryButton, saving && styles.buttonDisabled]}
-            hoverStyle={styles.primaryButtonHovered}
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
+            <Text style={styles.label}>Upload a photo of your ID</Text>
+            {idImageUri ? (
+              <View style={styles.previewContainer}>
+                <Image
+                  source={{ uri: idImageUri }}
+                  style={styles.idPreview}
+                  accessibilityLabel="Selected ID photo"
+                />
+                <HoverPressable onPress={removeIdImage} style={styles.removeImageButton}>
+                  <Text style={styles.removeImageText}>Remove photo</Text>
+                </HoverPressable>
+              </View>
             ) : (
-              <Text style={styles.primaryButtonText}>Save profile</Text>
+              <HoverPressable onPress={pickIdImage} style={styles.uploadButton}>
+                <Text style={styles.uploadButtonText}>Choose ID photo</Text>
+              </HoverPressable>
             )}
-          </HoverPressable>
+            <Text style={styles.note}>
+              Make sure the whole ID is visible, in focus, with no glare. Accepted: Passport, Driver&apos;s License,
+              National ID (PhilID), UMID, Voter&apos;s ID, or PRC ID.
+            </Text>
 
-          <HoverPressable
-            onPress={() => router.push('/')}
-            style={styles.secondaryLink}
-          >
-            <Text style={styles.secondaryLinkText}>Back to home</Text>
-          </HoverPressable>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            <HoverPressable
+              onPress={submitVerification}
+              disabled={submitting || !idType || !idImageUri}
+              style={[
+                styles.primaryButton,
+                (!idType || !idImageUri || submitting) && styles.buttonDisabled,
+              ]}
+            >
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Submit for verification</Text>
+              )}
+            </HoverPressable>
+            <Text style={styles.requiredNote}>
+              ID verification is required to finish creating your account.
+            </Text>
+          </>
+        )}
+      </ScrollView>
 
       <AppAlert
-        visible={savedAlertVisible}
-        title="Profile saved"
-        message="Your profile has been updated."
+        visible={showSubmitted}
+        title="Verification submitted"
+        message="Thank you! Your ID has been submitted for review. You can start using Gigmatch while we verify it."
         onDismiss={() => {
-          setSavedAlertVisible(false);
-          router.replace('/');
+          setShowSubmitted(false);
+          router.replace(destination);
         }}
       />
       <AppAlert
         visible={Boolean(error)}
-        title="Could not save profile"
+        title="Verification problem"
         message={error}
         onDismiss={() => setError('')}
       />
@@ -389,144 +290,68 @@ export default function ClientProfileScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: theme.background },
-  keyboardAvoiding: { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   content: {
-    width: '92%',
-    maxWidth: 640,
+    width: '90%',
+    maxWidth: 560,
     alignSelf: 'center',
-    paddingTop: 28,
-    paddingBottom: 48,
+    paddingTop: 36,
+    paddingBottom: 40,
     flexGrow: 1,
   },
   kicker: { color: theme.muted, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
-  title: { color: theme.accent, fontFamily: 'Georgia', fontSize: 34, lineHeight: 40, marginTop: 10 },
-  subtitle: { color: theme.muted, fontSize: 13, lineHeight: 21, marginTop: 8, marginBottom: 22 },
-  card: {
-    backgroundColor: '#F6F1EA',
-    borderWidth: 1,
-    borderColor: theme.border,
-    padding: 20,
-    marginBottom: 16,
-  },
-  avatarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  avatarImage: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: '#EAE1D7',
-  },
-  avatarPlaceholder: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    borderWidth: 1,
-    borderColor: theme.border,
-    backgroundColor: '#EAE1D7',
-    alignItems: 'center',
+  title: { color: theme.accent, fontFamily: 'Georgia', fontSize: 36, marginTop: 10 },
+  subtitle: { color: theme.muted, fontSize: 13, lineHeight: 21, marginTop: 9, marginBottom: 20 },
+  label: { color: theme.accent, fontSize: 12, fontWeight: '600', marginBottom: 8, marginTop: 14 },
+  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  typeOption: {
+    flexGrow: 1,
+    flexBasis: 150,
+    minHeight: 46,
     justifyContent: 'center',
-  },
-  avatarInitials: {
-    color: theme.accent,
-    fontFamily: 'Georgia',
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  avatarActions: {
-    flexDirection: 'row',
     alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 8,
-    flex: 1,
-  },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: theme.accent,
-    backgroundColor: '#FBF9F6',
-    paddingVertical: 9,
-    paddingHorizontal: 14,
-  },
-  secondaryButtonHovered: {
-    backgroundColor: '#EAE1D7',
-  },
-  secondaryButtonText: {
-    color: theme.accent,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  removePhotoButton: {
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: '#FBF9F6',
-    paddingVertical: 9,
+    paddingVertical: 10,
     paddingHorizontal: 12,
   },
-  removePhotoText: {
-    color: theme.muted,
-    fontSize: 12,
-    fontWeight: '600',
+  typeOptionSelected: { backgroundColor: theme.accent, borderColor: theme.accent },
+  typeText: { color: theme.accent, fontSize: 12, fontWeight: '600', textAlign: 'center' },
+  typeTextSelected: { color: '#fff' },
+  uploadButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: theme.accent,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
   },
-  label: {
-    color: theme.accent,
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 14,
-    marginBottom: 7,
-  },
-  input: {
+  uploadButtonText: { color: theme.accent, fontSize: 13, fontWeight: '700' },
+  previewContainer: { alignItems: 'flex-start', marginBottom: 4 },
+  idPreview: { width: 240, height: 150, borderWidth: 1, borderColor: theme.border, marginBottom: 8 },
+  removeImageButton: {
     borderWidth: 1,
     borderColor: theme.border,
     backgroundColor: '#FBF9F6',
-    paddingHorizontal: 13,
-    paddingVertical: 11,
-    color: theme.text,
-    fontSize: 13,
-    minHeight: 46,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
   },
-  inputReadonly: {
-    backgroundColor: '#EAE1D7',
-    color: theme.muted,
-  },
-  textArea: {
-    minHeight: 96,
-    paddingTop: 12,
-  },
+  removeImageText: { color: theme.text, fontSize: 11, fontWeight: '600' },
+  note: { color: theme.muted, fontSize: 11, lineHeight: 18, marginTop: 12, marginBottom: 6 },
   primaryButton: {
     backgroundColor: theme.accentDark,
     minHeight: 48,
+    paddingHorizontal: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginTop: 6,
+    marginTop: 18,
   },
-  primaryButtonHovered: {
-    opacity: 0.92,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.6,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  secondaryLink: {
-    alignItems: 'center',
-    paddingVertical: 14,
-  },
-  secondaryLinkText: {
-    color: theme.accent,
-    fontSize: 12,
-    fontWeight: '700',
-  },
+  primaryButtonText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.6 },
+  buttonDisabled: { opacity: 0.6 },
+  requiredNote: { color: theme.muted, fontSize: 10, lineHeight: 16, marginTop: 10, textAlign: 'center' },
+  submittedCard: { borderWidth: 1, borderColor: '#C4D1BD', backgroundColor: '#E8EFE4', padding: 18 },
+  submittedTitle: { color: '#36543B', fontSize: 16, fontWeight: '700', marginBottom: 6 },
+  submittedText: { color: '#36543B', fontSize: 12, lineHeight: 19, marginBottom: 10 },
 });
