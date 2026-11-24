@@ -56,6 +56,12 @@ export default function MusicianProfileScreen() {
   const upcomingDateValues = new Set(upcomingDates.map(({ dateValue }) => dateValue));
   const otherBlockedDates = unavailableDates.filter((date) => !upcomingDateValues.has(date));
 
+  useEffect(() => {
+    if (!authLoading && user?.role === 'admin') {
+      router.replace('/admin');
+    }
+  }, [authLoading, user?.role, router]);
+
   const loadProfile = useCallback(async () => {
     if (!token || user?.role !== 'musician') {
       setLoading(false);
@@ -353,7 +359,7 @@ export default function MusicianProfileScreen() {
     }
   };
 
-  if (authLoading || loading) {
+  if (authLoading || loading || user?.role === 'admin') {
     return (
       <SafeAreaView style={styles.safeArea}>
         <AppHeader active="Profile" />
