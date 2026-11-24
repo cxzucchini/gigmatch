@@ -20,7 +20,8 @@ app.use(cors({
   origin: allowedOrigins.length > 0 ? allowedOrigins : true,
   credentials: true,
 }));
-app.use(express.json({ limit: '20kb' }));
+app.use(express.json({ limit: '4mb' }));
+app.use(express.urlencoded({ extended: true, limit: '4mb' }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const requireDatabase = async (req, res, next) => {
