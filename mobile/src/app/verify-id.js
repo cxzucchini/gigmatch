@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Image, Platform } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -19,12 +19,42 @@ const ID_TYPES = [
   'PRC ID',
 ];
 
-function buildImagePayload(asset) {
+async function compressWebDataUrl(dataUrl, maxWidth = 1024, quality = 0.6) {
+  if (Platform.OS !== 'web' || typeof document === 'undefined' || !dataUrl) {
+    return dataUrl;
+  }
+
+  return new Promise((resolve) => {
+    const img = new window.Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+async function buildImagePayload(asset) {
   if (!asset) return null;
   if (asset.base64 && typeof asset.base64 === 'string') {
     const rawMime = asset.mimeType || '';
     const mimeType = rawMime.startsWith('image/') ? rawMime : 'image/jpeg';
-    return `data:${mimeType};base64,${asset.base64}`;
+    const rawDataUrl = `data:${mimeType};base64,${asset.base64}`;
+    return compressWebDataUrl(rawDataUrl, 1024, 0.6);
   }
   return asset.uri || null;
 }
@@ -74,8 +104,6 @@ export default function VerifyIdScreen() {
     Promise.resolve().then(loadStatus);
   }, [loadStatus]);
 
-  // A real submission always has submittedAt; schema defaults alone produce a
-  // status-less 'pending' subdocument for accounts that never uploaded anything.
   const alreadySubmitted = Boolean(verification && verification.submittedAt);
   const isApproved = verification?.status === 'approved';
 
@@ -85,17 +113,22 @@ export default function VerifyIdScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: false,
-        quality: 0.7,
+        quality: 0.45,
         base64: true,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         const previewUri = asset.uri || null;
-        const payloadUri = buildImagePayload(asset);
+        const payloadUri = await buildImagePayload(asset);
 
         if (!previewUri && !payloadUri) {
           setError('Upload a valid photo of your ID');
+          return;
+        }
+
+        if (typeof payloadUri === 'string' && payloadUri.length > 3_200_000) {
+          setError('Photo is still too large after compression. Try a smaller image.');
           return;
         }
 
@@ -178,17 +211,6 @@ export default function VerifyIdScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <AppHeader active="Account" />
-
-      {!isApproved ? (
-        <View style={styles.pinnedTopBar}>
-          <Text style={styles.pinnedBadge}>REQUIRED</Text>
-          <Text style={styles.pinnedText} numberOfLines={2}>
-            {alreadySubmitted
-              ? 'ID verification is under review for your account.'
-              : 'ID verification is required to complete your account setup.'}
-          </Text>
-        </View>
-      ) : null}
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.kicker}>ACCOUNT SECURITY</Text>
@@ -303,31 +325,6 @@ export default function VerifyIdScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: theme.background },
-  pinnedTopBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: theme.accentDark,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  pinnedBadge: {
-    backgroundColor: theme.accent,
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    paddingVertical: 3,
-    paddingHorizontal: 7,
-  },
-  pinnedText: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
   content: {
