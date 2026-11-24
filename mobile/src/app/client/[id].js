@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, ActivityIndicator, Platform, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { theme } from '../../styles/theme';
@@ -136,15 +136,28 @@ export default function ClientProfileScreen() {
   const [showVerifiedTip, setShowVerifiedTip] = useState(false);
   const [badgeHovered, setBadgeHovered] = useState(false);
 
+  const normalizedId = Array.isArray(id) ? id[0] : id;
+  const isStaticProfileRoute = normalizedId === 'profile';
+
+  useEffect(() => {
+    if (isStaticProfileRoute) {
+      router.replace('/client/profile');
+    }
+  }, [isStaticProfileRoute, router]);
+
   useEffect(() => {
     let active = true;
-    if (!token || !id) {
+    if (isStaticProfileRoute) {
+      setLoading(false);
+      return () => { active = false; };
+    }
+    if (!token || !normalizedId) {
       setLoading(false);
       return () => { active = false; };
     }
     setLoading(true);
     setError('');
-    apiRequest(`/users/${id}/profile`, { token })
+    apiRequest(`/users/${normalizedId}/profile`, { token })
       .then((result) => {
         if (!active) return;
         setProfile(result.profile);
@@ -159,7 +172,7 @@ export default function ClientProfileScreen() {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [id, token]);
+  }, [normalizedId, token, isStaticProfileRoute]);
 
   const isVerified = Boolean(
     profile && (profile.isVerified || profile.idVerification?.status === 'approved')
@@ -194,7 +207,7 @@ export default function ClientProfileScreen() {
     return 'Not yet verified';
   })();
 
-  if (authLoading || (loading && token)) {
+  if (isStaticProfileRoute || authLoading || (loading && token)) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <AppHeader active="Bookings" />
@@ -238,6 +251,8 @@ export default function ClientProfileScreen() {
     );
   }
 
+  const avatarUrl = profile.avatarUrl || profile.profilePicture || '';
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <AppHeader active="Bookings" />
@@ -255,6 +270,13 @@ export default function ClientProfileScreen() {
         </View>
 
         <View style={styles.nameRow}>
+          {avatarUrl ? (
+            <Image
+              source={{ uri: avatarUrl }}
+              style={styles.avatarImage}
+              accessibilityLabel={`${profile.name} profile picture`}
+            />
+          ) : null}
           <Text style={styles.name}>{profile.name}</Text>
 
           <View
@@ -411,6 +433,7 @@ const styles = StyleSheet.create({
   },
   chipText: { color: theme.accent, textTransform: 'uppercase', fontSize: 12, fontWeight: '700', letterSpacing: 1.2 },
   nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 12, zIndex: 30 },
+  avatarImage: { width: 52, height: 52, borderRadius: 26, borderWidth: 1, borderColor: theme.border, backgroundColor: '#EAE1D7' },
   name: { color: theme.accent, fontSize: 38, lineHeight: 42, fontFamily: 'Georgia', flexShrink: 1 },
   verifiedWrapper: { position: 'relative', width: 36, height: 36, justifyContent: 'center', alignItems: 'center', zIndex: 40 },
   stickerButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
