@@ -151,6 +151,7 @@ export default function BookingsScreen() {
           {displayedBookings.map((booking) => {
             const musicianName = booking.musician?.user?.name || 'Musician';
             const clientName = booking.client?.name || 'Client';
+            const clientId = typeof booking.client === 'object' ? booking.client?._id : booking.client;
             const isAssignedMusician = user?.role === 'musician';
             const canRespond = isAssignedMusician && booking.status === 'pending';
             const canCancel = user?.role === 'client' && ['pending', 'accepted'].includes(booking.status);
@@ -166,7 +167,19 @@ export default function BookingsScreen() {
                   <Text style={[styles.status, styles[`status_${booking.status}`]]}>{booking.status.toUpperCase()}</Text>
                 </View>
                 <View style={styles.separator} />
-                <Text style={styles.detail}>With {isAssignedMusician ? clientName : musicianName}</Text>
+                <View style={styles.withRow}>
+                  <Text style={styles.detail}>With {isAssignedMusician ? clientName : musicianName}</Text>
+                  {isAssignedMusician && clientId ? (
+                    <Pressable
+                      onPress={() => router.push({ pathname: '/client/[id]', params: { id: String(clientId) } })}
+                      accessibilityRole="button"
+                      accessibilityLabel={`View profile of ${clientName}`}
+                      style={styles.viewProfileLink}
+                    >
+                      <Text style={styles.viewProfileLinkText}>View profile</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
                 <Text style={[styles.detail, styles.detailMuted]}>{booking.venue} · {booking.serviceArea}</Text>
                 {user?.role === 'client' && Number.isFinite(booking.venueCoordinates?.latitude) && Number.isFinite(booking.venueCoordinates?.longitude) ? (
                   <View style={styles.venueMap}>
@@ -192,6 +205,16 @@ export default function BookingsScreen() {
                 {user ? (
                   <View style={styles.actionsContainer}>
                     <View style={styles.messageActionRow}>
+                      {isAssignedMusician && clientId ? (
+                        <Pressable
+                          onPress={() => router.push({ pathname: '/client/[id]', params: { id: String(clientId) } })}
+                          accessibilityRole="button"
+                          accessibilityLabel={`View profile of ${clientName}`}
+                          style={styles.messageButton}
+                        >
+                          <Text style={styles.messageButtonText}>👤 View {clientName}&apos;s profile</Text>
+                        </Pressable>
+                      ) : null}
                       <Pressable
                         onPress={() => router.push({
                           pathname: '/messages/[bookingId]',
@@ -254,7 +277,7 @@ const styles = StyleSheet.create({
   kicker: { color: theme.muted, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
   title: { color: theme.accent, fontFamily: 'Georgia', fontSize: 38, marginTop: 10 },
   subtitle: { color: theme.muted, fontSize: 14, marginTop: 8, marginBottom: 24 },
-    empty: { alignItems: 'center', backgroundColor: '#F6F1EA', borderWidth: 1, borderColor: theme.border, padding: 20, marginTop: 12 },
+  empty: { alignItems: 'center', backgroundColor: '#F6F1EA', borderWidth: 1, borderColor: theme.border, padding: 20, marginTop: 12 },
   emptyTitle: { color: theme.accent, fontFamily: 'Georgia', fontSize: 20, textAlign: 'center' },
   emptyCopy: { color: theme.muted, fontSize: 13, marginTop: 10, textAlign: 'center' },
   list: { gap: 14 },
@@ -269,6 +292,9 @@ const styles = StyleSheet.create({
   status_cancelled: { backgroundColor: '#FEF08A', color: '#854D0E', borderWidth: 1, borderColor: '#CA8A04' },
   status_completed: { backgroundColor: '#E6E0D5', color: theme.accent, borderWidth: 1, borderColor: '#D4C9B8' },
   separator: { height: 1, backgroundColor: theme.border, marginVertical: 13 },
+  withRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 },
+  viewProfileLink: { paddingVertical: 2, paddingHorizontal: 6 },
+  viewProfileLinkText: { color: theme.accent, fontSize: 12, fontWeight: '700', textDecorationLine: 'underline' },
   detail: { color: theme.accent, fontSize: 13, lineHeight: 20 },
   detailMuted: { color: theme.muted },
   venueMap: { borderWidth: 1, borderColor: theme.border, backgroundColor: '#F6F1EA', padding: 6, marginTop: 12, marginBottom: 8 },
@@ -278,8 +304,8 @@ const styles = StyleSheet.create({
   mapNote: { color: theme.muted, fontSize: 10, lineHeight: 15, marginTop: 7 },
   notes: { color: theme.muted, fontSize: 12, lineHeight: 19, marginTop: 8 },
   actionsContainer: { marginTop: 15, gap: 10 },
-  messageActionRow: { flexDirection: 'row' },
-  messageButton: { borderWidth: 1, borderColor: theme.accent, paddingVertical: 10, paddingHorizontal: 15, flex: 1, minHeight: 40, justifyContent: 'center', alignItems: 'center' },
+  messageActionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  messageButton: { borderWidth: 1, borderColor: theme.accent, paddingVertical: 10, paddingHorizontal: 15, flex: 1, minWidth: 140, minHeight: 40, justifyContent: 'center', alignItems: 'center' },
   messageButtonText: { color: theme.accent, fontSize: 12, fontWeight: '700' },
   lifecycleActionRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   button: { backgroundColor: theme.accent, paddingVertical: 10, paddingHorizontal: 16, minHeight: 40, justifyContent: 'center' },
