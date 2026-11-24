@@ -10,15 +10,36 @@ import { useAuth } from '../context/AuthContext';
 import { apiRequest } from '../services/api';
 import { theme } from '../styles/theme';
 
-const ID_TYPES = ['Passport', "Driver's License", 'National ID (PhilID)', 'UMID', "Voter's ID", 'PRC ID'];
+const ID_TYPES = [
+  'Passport',
+  "Driver's License",
+  'National ID (PhilID)',
+  'UMID',
+  "Voter's ID",
+  'PRC ID',
+];
+
+function buildImagePayload(asset) {
+  if (!asset) return null;
+  if (asset.base64 && typeof asset.base64 === 'string') {
+    const rawMime = asset.mimeType || '';
+    const mimeType = rawMime.startsWith('image/') ? rawMime : 'image/jpeg';
+    return `data:${mimeType};base64,${asset.base64}`;
+  }
+  return asset.uri || null;
+}
 
 export default function VerifyIdScreen() {
   const router = useRouter();
-  const { user, token, loading: authLoading } = useAuth();
+  const auth = useAuth();
+  const { user, token, loading: authLoading } = auth;
+  const refreshUser = auth?.refreshUser;
+
   const [checking, setChecking] = useState(true);
   const [verification, setVerification] = useState(null);
   const [idType, setIdType] = useState('');
   const [idImageUri, setIdImageUri] = useState(null);
+  const [idUploadPayload, setIdUploadPayload] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showSubmitted, setShowSubmitted] = useState(false);
@@ -33,9 +54,14 @@ export default function VerifyIdScreen() {
     try {
       const data = await apiRequest('/auth/verify-id', { token });
       setVerification(data.verification || null);
-      if (data.verification && data.verification.submittedAt && data.verification.status !== 'rejected') {
+      if (
+        data.verification &&
+        data.verification.submittedAt &&
+        data.verification.status !== 'rejected'
+      ) {
         setIdType(data.verification.idDocumentType || '');
         setIdImageUri(data.verification.idDocumentUrl || null);
+        setIdUploadPayload(data.verification.idDocumentUrl || null);
       }
     } catch {
       // New accounts have no submission yet; show the form.
@@ -51,18 +77,30 @@ export default function VerifyIdScreen() {
   // A real submission always has submittedAt; schema defaults alone produce a
   // status-less 'pending' subdocument for accounts that never uploaded anything.
   const alreadySubmitted = Boolean(verification && verification.submittedAt);
+  const isApproved = verification?.status === 'approved';
 
   const pickIdImage = async () => {
     setError('');
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [16, 10],
+        allowsEditing: false,
         quality: 0.7,
+        base64: true,
       });
+
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setIdImageUri(result.assets[0].uri);
+        const asset = result.assets[0];
+        const previewUri = asset.uri || null;
+        const payloadUri = buildImagePayload(asset);
+
+        if (!previewUri && !payloadUri) {
+          setError('Upload a valid photo of your ID');
+          return;
+        }
+
+        setIdImageUri(previewUri || payloadUri);
+        setIdUploadPayload(payloadUri || previewUri);
       }
     } catch {
       setError('Could not open your photo library. Please try again.');
@@ -71,6 +109,7 @@ export default function VerifyIdScreen() {
 
   const removeIdImage = () => {
     setIdImageUri(null);
+    setIdUploadPayload(null);
   };
 
   const submitVerification = async () => {
@@ -79,8 +118,10 @@ export default function VerifyIdScreen() {
       setError('Choose the type of ID you are uploading.');
       return;
     }
-    if (!idImageUri) {
-      setError('Upload a clear photo of your ID.');
+
+    const documentToSend = idUploadPayload || idImageUri;
+    if (!documentToSend) {
+      setError('Upload a valid photo of your ID');
       return;
     }
 
@@ -89,9 +130,15 @@ export default function VerifyIdScreen() {
       const data = await apiRequest('/auth/verify-id', {
         method: 'POST',
         token,
-        body: JSON.stringify({ idDocumentType: idType, idDocumentUrl: idImageUri }),
+        body: JSON.stringify({
+          idDocumentType: idType,
+          idDocumentUrl: documentToSend,
+        }),
       });
       setVerification(data.verification);
+      if (typeof refreshUser === 'function') {
+        await refreshUser();
+      }
       setShowSubmitted(true);
     } catch (requestError) {
       setError(requestError.message || 'Unable to submit your ID right now.');
@@ -104,7 +151,9 @@ export default function VerifyIdScreen() {
     return (
       <SafeAreaView style={styles.safeArea}>
         <AppHeader active="Account" />
-        <View style={styles.center}><ActivityIndicator color={theme.accent} /></View>
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.accent} />
+        </View>
       </SafeAreaView>
     );
   }
@@ -115,7 +164,9 @@ export default function VerifyIdScreen() {
         <AppHeader active="Account" />
         <View style={styles.centerContent}>
           <Text style={styles.title}>Verify your identity.</Text>
-          <Text style={styles.subtitle}>Sign in to complete the required ID verification for your account.</Text>
+          <Text style={styles.subtitle}>
+            Sign in to complete the required ID verification for your account.
+          </Text>
           <HoverPressable onPress={() => router.push('/auth')} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Sign in</Text>
           </HoverPressable>
@@ -127,6 +178,18 @@ export default function VerifyIdScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <AppHeader active="Account" />
+
+      {!isApproved ? (
+        <View style={styles.pinnedTopBar}>
+          <Text style={styles.pinnedBadge}>REQUIRED</Text>
+          <Text style={styles.pinnedText} numberOfLines={2}>
+            {alreadySubmitted
+              ? 'ID verification is under review for your account.'
+              : 'ID verification is required to complete your account setup.'}
+          </Text>
+        </View>
+      ) : null}
+
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.kicker}>ACCOUNT SECURITY</Text>
         <Text style={styles.title}>Verify your identity.</Text>
@@ -138,15 +201,19 @@ export default function VerifyIdScreen() {
         {alreadySubmitted ? (
           <View style={styles.submittedCard}>
             <Text style={styles.submittedTitle}>
-              {verification.status === 'approved' ? 'Your ID is verified.' : 'Your ID is under review.'}
+              {isApproved ? 'Your ID is verified.' : 'Your ID is under review.'}
             </Text>
             <Text style={styles.submittedText}>
-              {verification.status === 'approved'
+              {isApproved
                 ? 'Thank you — your account is fully verified and you have full access to Gigmatch.'
                 : `We received your ${verification.idDocumentType || 'ID'}. Verification usually takes 1–2 days, but you can start using Gigmatch now.`}
             </Text>
             {idImageUri ? (
-              <Image source={{ uri: idImageUri }} style={styles.idPreview} accessibilityLabel="Uploaded ID photo" />
+              <Image
+                source={{ uri: idImageUri }}
+                style={styles.idPreview}
+                accessibilityLabel="Uploaded ID photo"
+              />
             ) : null}
             <HoverPressable onPress={() => router.replace(destination)} style={styles.primaryButton}>
               <Text style={styles.primaryButtonText}>Continue to Gigmatch</Text>
@@ -165,7 +232,9 @@ export default function VerifyIdScreen() {
                   onPress={() => setIdType(option)}
                   style={[styles.typeOption, idType === option && styles.typeOptionSelected]}
                 >
-                  <Text style={[styles.typeText, idType === option && styles.typeTextSelected]}>{option}</Text>
+                  <Text style={[styles.typeText, idType === option && styles.typeTextSelected]}>
+                    {option}
+                  </Text>
                 </HoverPressable>
               ))}
             </View>
@@ -173,7 +242,11 @@ export default function VerifyIdScreen() {
             <Text style={styles.label}>Upload a photo of your ID</Text>
             {idImageUri ? (
               <View style={styles.previewContainer}>
-                <Image source={{ uri: idImageUri }} style={styles.idPreview} accessibilityLabel="Selected ID photo" />
+                <Image
+                  source={{ uri: idImageUri }}
+                  style={styles.idPreview}
+                  accessibilityLabel="Selected ID photo"
+                />
                 <HoverPressable onPress={removeIdImage} style={styles.removeImageButton}>
                   <Text style={styles.removeImageText}>Remove photo</Text>
                 </HoverPressable>
@@ -191,11 +264,20 @@ export default function VerifyIdScreen() {
             <HoverPressable
               onPress={submitVerification}
               disabled={submitting || !idType || !idImageUri}
-              style={[styles.primaryButton, (!idType || !idImageUri || submitting) && styles.buttonDisabled]}
+              style={[
+                styles.primaryButton,
+                (!idType || !idImageUri || submitting) && styles.buttonDisabled,
+              ]}
             >
-              {submitting ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Submit for verification</Text>}
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Submit for verification</Text>
+              )}
             </HoverPressable>
-            <Text style={styles.requiredNote}>ID verification is required to finish creating your account.</Text>
+            <Text style={styles.requiredNote}>
+              ID verification is required to finish creating your account.
+            </Text>
           </>
         )}
       </ScrollView>
@@ -221,26 +303,89 @@ export default function VerifyIdScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: theme.background },
+  pinnedTopBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: theme.accentDark,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  pinnedBadge: {
+    backgroundColor: theme.accent,
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1,
+    paddingVertical: 3,
+    paddingHorizontal: 7,
+  },
+  pinnedText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   centerContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
-  content: { width: '90%', maxWidth: 560, alignSelf: 'center', paddingTop: 36, paddingBottom: 40, flexGrow: 1 },
+  content: {
+    width: '90%',
+    maxWidth: 560,
+    alignSelf: 'center',
+    paddingTop: 28,
+    paddingBottom: 40,
+    flexGrow: 1,
+  },
   kicker: { color: theme.muted, fontSize: 10, fontWeight: '700', letterSpacing: 2 },
   title: { color: theme.accent, fontFamily: 'Georgia', fontSize: 36, marginTop: 10 },
   subtitle: { color: theme.muted, fontSize: 13, lineHeight: 21, marginTop: 9, marginBottom: 20 },
   label: { color: theme.accent, fontSize: 12, fontWeight: '600', marginBottom: 8, marginTop: 14 },
   typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  typeOption: { flexGrow: 1, flexBasis: 150, minHeight: 46, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: theme.border, backgroundColor: '#FBF9F6', paddingVertical: 10, paddingHorizontal: 12 },
+  typeOption: {
+    flexGrow: 1,
+    flexBasis: 150,
+    minHeight: 46,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: '#FBF9F6',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
   typeOptionSelected: { backgroundColor: theme.accent, borderColor: theme.accent },
   typeText: { color: theme.accent, fontSize: 12, fontWeight: '600', textAlign: 'center' },
   typeTextSelected: { color: '#fff' },
-  uploadButton: { alignSelf: 'flex-start', borderWidth: 1, borderColor: theme.accent, paddingVertical: 11, paddingHorizontal: 18 },
+  uploadButton: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: theme.accent,
+    paddingVertical: 11,
+    paddingHorizontal: 18,
+  },
   uploadButtonText: { color: theme.accent, fontSize: 13, fontWeight: '700' },
   previewContainer: { alignItems: 'flex-start', marginBottom: 4 },
   idPreview: { width: 240, height: 150, borderWidth: 1, borderColor: theme.border, marginBottom: 8 },
-  removeImageButton: { borderWidth: 1, borderColor: theme.border, backgroundColor: '#FBF9F6', paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 },
+  removeImageButton: {
+    borderWidth: 1,
+    borderColor: theme.border,
+    backgroundColor: '#FBF9F6',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
   removeImageText: { color: theme.text, fontSize: 11, fontWeight: '600' },
   note: { color: theme.muted, fontSize: 11, lineHeight: 18, marginTop: 12, marginBottom: 6 },
-  primaryButton: { backgroundColor: theme.accentDark, minHeight: 48, paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center', marginTop: 18 },
+  primaryButton: {
+    backgroundColor: theme.accentDark,
+    minHeight: 48,
+    paddingHorizontal: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 18,
+  },
   primaryButtonText: { color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 0.6 },
   buttonDisabled: { opacity: 0.6 },
   requiredNote: { color: theme.muted, fontSize: 10, lineHeight: 16, marginTop: 10, textAlign: 'center' },

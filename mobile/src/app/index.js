@@ -42,7 +42,8 @@ export default function HomeScreen() {
   const [locationError, setLocationError] = useState('');
   const [loadError, setLoadError] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const { token } = useAuth();
+  const { user, token } = useAuth();
+  const showRequiredIdBar = Boolean(user && user.verificationStatus !== 'verified');
   const columns = width >= 980 ? 3 : width >= 640 ? 2 : 1;
   const compact = width < 640;
   const cardWidth = columns === 1 ? '100%' : columns === 2 ? '48.5%' : '31.8%';
@@ -122,6 +123,29 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <AppHeader active="Discover" />
+      {showRequiredIdBar ? (
+        <View style={styles.requiredIdBar}>
+          <View style={styles.requiredIdTextWrap}>
+            <Text style={styles.requiredIdBadge}>REQUIRED</Text>
+            <Text style={styles.requiredIdText} numberOfLines={2}>
+              {user.verificationStatus === 'pending'
+                ? 'ID verification is under review for your account.'
+                : 'ID verification is required to complete your account.'}
+            </Text>
+          </View>
+          <HoverPressable
+            accessibilityRole="button"
+            accessibilityLabel="Verify your identity"
+            onPress={() => router.push('/verify-id')}
+            style={styles.requiredIdButton}
+            hoverStyle={styles.requiredIdButtonHovered}
+          >
+            <Text style={styles.requiredIdButtonText}>
+              {user.verificationStatus === 'pending' ? 'View status' : 'Verify ID'}
+            </Text>
+          </HoverPressable>
+        </View>
+      ) : null}
       <ScrollView ref={scrollRef} contentContainerStyle={styles.container}>
         <ImageBackground
           source={{ uri: 'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1800&q=85' }}
@@ -353,6 +377,53 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: theme.background },
+  requiredIdBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    backgroundColor: theme.accentDark,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  requiredIdTextWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  requiredIdBadge: {
+    backgroundColor: theme.accent,
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 1,
+    paddingVertical: 3,
+    paddingHorizontal: 6,
+  },
+  requiredIdText: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  requiredIdButton: {
+    backgroundColor: '#F6F1EA',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+  },
+  requiredIdButtonHovered: {
+    opacity: 0.9,
+  },
+  requiredIdButtonText: {
+    color: theme.accent,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+  },
   container: { paddingBottom: 0, flexGrow: 1 },
   hero: { width: '96%', maxWidth: 1360, minHeight: 470, alignSelf: 'center', marginTop: 16, padding: 34, justifyContent: 'center', overflow: 'hidden', backgroundColor: theme.accentDark },
   compactHero: { minHeight: 370, padding: 24 },
