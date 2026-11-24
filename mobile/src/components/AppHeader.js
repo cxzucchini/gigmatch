@@ -26,19 +26,22 @@ export default function AppHeader({ active }) {
   const unreadCount = useUnreadNotifications();
   const [menuVisible, setMenuVisible] = useState(false);
 
-  const links = [
-    { label: 'Discover', route: '/' },
-    ...(user ? [] : [
-      { label: 'About', route: '/about' },
-      { label: 'Contact', route: '/contact' },
-      { label: 'Feedback', route: '/feedback' },
-    ]),
-    ...(user ? [{ label: 'Bookings', route: '/bookings' }] : []),
-    ...(user ? [{ label: 'Messages', route: '/messages' }] : []),
-    ...(user && desktop ? [{ label: 'Notifications', route: '/notifications', badge: unreadCount }] : []),
-    ...(user?.role === 'musician' ? [{ label: 'My profile', route: '/musician/profile' }] : []),
-    ...(user?.role === 'admin' ? [{ label: 'Admin', route: '/admin' }] : []),
-  ];
+  const isAdmin = user?.role === 'admin';
+
+  const links = isAdmin
+    ? [{ label: 'Admin', route: '/admin' }]
+    : [
+        { label: 'Discover', route: '/' },
+        ...(user ? [] : [
+          { label: 'About', route: '/about' },
+          { label: 'Contact', route: '/contact' },
+          { label: 'Feedback', route: '/feedback' },
+        ]),
+        ...(user ? [{ label: 'Bookings', route: '/bookings' }] : []),
+        ...(user ? [{ label: 'Messages', route: '/messages' }] : []),
+        ...(user && desktop ? [{ label: 'Notifications', route: '/notifications', badge: unreadCount }] : []),
+        ...(user?.role === 'musician' ? [{ label: 'My profile', route: '/musician/profile' }] : []),
+      ];
 
   const accountButton = (
     <HoverPressable
@@ -65,8 +68,7 @@ export default function AppHeader({ active }) {
 
   const mobileRightActions = (
     <View style={styles.mobileRightGroup}>
-      {user ? (
-        // Inside mobileRightActions:
+      {user && !isAdmin ? (
         <TouchableOpacity
           onPress={() => router.push('/notifications')}
           style={[styles.bellButton, active === 'Notifications' && styles.bellButtonActive]}
@@ -98,7 +100,7 @@ export default function AppHeader({ active }) {
             <HoverPressable
               accessibilityRole="link"
               accessibilityLabel="Gigmatch home"
-              onPress={() => router.push('/')}
+              onPress={() => router.push(isAdmin ? '/admin' : '/')}
               style={styles.brand}
               hoverStyle={styles.brandHovered}
             >
@@ -146,7 +148,7 @@ export default function AppHeader({ active }) {
               <HoverPressable
                 accessibilityRole="link"
                 accessibilityLabel="Gigmatch home"
-                onPress={() => router.push('/')}
+                onPress={() => router.push(isAdmin ? '/admin' : '/')}
                 style={styles.mobileBrand}
                 hoverStyle={styles.brandHovered}
               >
@@ -206,7 +208,7 @@ export default function AppHeader({ active }) {
                 onPress={() => { setMenuVisible(false); router.push('/auth'); }}
                 style={styles.drawerGetStartedButton}
               >
-                <Text style={styles.drawerGetStartedText}>GET STARTED</Text>
+                <Text style={styles.drawerGetStartedText}>{user ? 'ACCOUNT' : 'GET STARTED'}</Text>
               </HoverPressable>
             </View>
           </View>
