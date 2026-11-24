@@ -16,6 +16,8 @@ import { apiRequest } from '../../services/api';
 import { isMongoId, normalizeMusician } from '../../utils/musician';
 import { getUpcomingDates } from '../../utils/availability';
 
+const NEW_ARTIST_DAYS = 14;
+
 const SCALLOP_PATH =
   'M 50 7 C 54 7, 57 12, 61 13 C 65 14, 70 11, 74 13 C 77 15, 78 21, 81 24 C 84 27, 90 28, 92 31 C 94 35, 91 40, 92 44 C 93 48, 98 51, 98 55 C 98 59, 93 62, 92 66 C 91 70, 94 75, 92 79 C 90 82, 84 83, 81 86 C 78 89, 77 95, 74 97 C 70 99, 65 96, 61 97 C 57 98, 54 103, 50 103 C 46 103, 43 98, 39 97 C 35 96, 30 99, 26 97 C 23 95, 22 89, 19 86 C 16 83, 10 82, 8 79 C 6 75, 9 70, 8 66 C 7 62, 2 59, 2 55 C 2 51, 7 48, 8 44 C 9 40, 6 35, 8 31 C 10 28, 16 27, 19 24 C 22 21, 23 15, 26 13 C 30 11, 35 14, 39 13 C 43 12, 46 7, 50 7 Z';
 
@@ -24,6 +26,44 @@ const SERIF_FONT = Platform.select({
   android: 'serif',
   default: 'Georgia',
 });
+
+function isNewArtist(artist, days = NEW_ARTIST_DAYS) {
+  if (!artist || artist.isNew === false) return false;
+  const rawDate =
+    artist.createdAt ||
+    artist.joinedAt ||
+    artist.memberSince ||
+    artist.user?.createdAt;
+  if (!rawDate) return false;
+  const createdTime = new Date(rawDate).getTime();
+  if (Number.isNaN(createdTime)) return false;
+  const ageDays = (Date.now() - createdTime) / (1000 * 60 * 60 * 24);
+  return ageDays >= 0 && ageDays <= days;
+}
+
+function getCompletedTransactionsCount(artist) {
+  if (!artist) return 0;
+  const candidates = [
+    artist.completedBookingsCount,
+    artist.completedGigs,
+    artist.completedCount,
+    artist.transactionsCount,
+    artist.transactionCount,
+    artist.bookingsCount,
+    Array.isArray(artist.completedBookings) ? artist.completedBookings.length : null,
+  ];
+
+  for (const value of candidates) {
+    if (value !== null && value !== undefined && value !== '') {
+      const num = Number(value);
+      if (Number.isFinite(num) && num >= 0) {
+        return Math.floor(num);
+      }
+    }
+  }
+
+  return 0;
+}
 
 function VerifiedStickerBadge({ isVerified }) {
   if (Platform.OS === 'web') {
@@ -205,6 +245,8 @@ export default function ArtistDetailScreen() {
 
   const infoColumns = width >= 900;
   const playlistTracks = Array.isArray(artist?.playlist) ? artist.playlist : [];
+  const showNewBadge = isNewArtist(artist);
+  const completedTransactionsCount = getCompletedTransactionsCount(artist);
 
   const isVerified = Boolean(
     artist &&
@@ -355,6 +397,11 @@ export default function ArtistDetailScreen() {
             resizeMode="contain"
             style={styles.heroImage}
           />
+          {showNewBadge ? (
+            <View style={styles.newBadge}>
+              <Text style={styles.newBadgeText}>NEW ARTIST</Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.metaRow}>
@@ -419,7 +466,9 @@ export default function ArtistDetailScreen() {
 
         <View style={styles.ratingRow}>
           <Text style={styles.star}>★</Text>
-          <Text style={styles.ratingText}>{artist.rating ? `${artist.rating.toFixed(1)}` : 'New artist'}</Text>
+          <Text style={styles.ratingText}>
+            {artist.rating ? `${artist.rating.toFixed(1)}` : showNewBadge ? 'New artist' : 'No ratings yet'}
+          </Text>
           <Text style={styles.divider}>|</Text>
           <Text style={styles.location}>{artist.location}</Text>
         </View>
@@ -447,6 +496,14 @@ export default function ArtistDetailScreen() {
               <Text style={styles.infoText}>{artist.description}</Text>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>GENRE</Text><Text style={styles.detailValue}>{artist.genre}</Text></View>
               <View style={styles.detailRow}><Text style={styles.detailLabel}>BASED IN</Text><Text style={styles.detailValue}>{artist.location}</Text></View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>TRANSACTIONS</Text>
+                <Text style={styles.detailValue}>
+                  {completedTransactionsCount > 0
+                    ? `✓ ${completedTransactionsCount} completed ${completedTransactionsCount === 1 ? 'transaction' : 'transactions'}`
+                    : '0 completed transactions'}
+                </Text>
+              </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>VERIFICATION</Text>
                 <Text style={styles.detailValue}>
@@ -647,6 +704,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   heroBanner: {
+    position: 'relative',
     width: '100%',
     height: 320,
     borderRadius: 14,
@@ -677,6 +735,23 @@ const styles = StyleSheet.create({
     maxHeight: 296,
     aspectRatio: 1,
     borderRadius: 10,
+  },
+  newBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    backgroundColor: '#231712',
+    borderWidth: 1,
+    borderColor: 'rgba(228, 201, 169, 0.35)',
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+  },
+  newBadgeText: {
+    color: '#E4C9A9',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
   },
   metaRow: {
     flexDirection: 'row',
