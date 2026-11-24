@@ -233,15 +233,19 @@ export default function AuthScreen() {
               <Text style={styles.subtitle}>{user.email}</Text>
               <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{user.role.toUpperCase()}</Text></View>
               {sessionError ? <Text style={styles.notice}>{sessionError}</Text> : null}
-              <HoverPressable
-                onPress={() => router.replace(user.role === 'musician' ? '/musician/profile' : '/')}
-                style={styles.primaryButton}
-                hoverStyle={styles.buttonHovered}
-              >
-                <Text style={styles.primaryButtonText}>
-                  {user.role === 'musician' ? 'Set up or edit your profile' : 'Set up your profile'}
-                </Text>
-              </HoverPressable>
+              {user.role !== 'admin' ? (
+                <HoverPressable
+                  onPress={() =>
+                    router.push(user.role === 'musician' ? '/musician/profile' : '/client/profile')
+                  }
+                  style={styles.primaryButton}
+                  hoverStyle={styles.buttonHovered}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    {user.role === 'musician' ? 'Set up or edit your profile' : 'Set up your profile'}
+                  </Text>
+                </HoverPressable>
+              ) : null}
               <HoverPressable onPress={async () => { await signOut(); }} style={styles.textButton}>
                 <Text style={styles.textButtonText}>Sign out</Text>
               </HoverPressable>
